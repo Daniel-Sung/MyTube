@@ -2137,8 +2137,13 @@ function init() {
   renderAll();
 
   // Firebase auth
-  if (auth) auth.onAuthStateChanged(onAuthChanged);
-  else renderLoginBanner();
+  if (auth) {
+    auth.getRedirectResult().catch(err => {
+      console.warn('Redirect sign-in error:', err);
+      showToast('로그인 실패: ' + (err.message || err.code));
+    });
+    auth.onAuthStateChanged(onAuthChanged);
+  } else renderLoginBanner();
 
   // Load YouTube IFrame API
   loadYouTubeAPI();
