@@ -1,0 +1,2205 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#FF0000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MyTube">
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com https://www.gstatic.com;
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: https://i.ytimg.com https://yt3.ggpht.com https://yt3.googleusercontent.com https://lh3.googleusercontent.com https:;
+  connect-src 'self' https://*.googleapis.com https://*.google.com https://www.youtube.com;
+  font-src 'self';
+  frame-src https://www.youtube.com https://www.youtube-nocookie.com https://*.firebaseapp.com;">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>MyTube - 나만의 유튜브</title>
+<style>
+/* ============== CSS Variables ============== */
+:root {
+  --red: #FF0000;
+  --red-dark: #CC0000;
+  --red-light: #FF4444;
+  --red-bg: #FFF0F0;
+  --bg: #F9F9F9;
+  --card: #FFFFFF;
+  --text: #0F0F0F;
+  --text-sub: #606060;
+  --text-light: #909090;
+  --border: #E5E5E5;
+  --danger: #E17055;
+  --success: #00B894;
+  --shadow: 0 1px 6px rgba(0,0,0,0.08);
+  --shadow-lg: 0 4px 20px rgba(0,0,0,0.12);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --tab-height: 60px;
+  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+[data-theme="dark"] {
+  --red-bg: #2A1010;
+  --bg: #0F0F0F;
+  --card: #1A1A1A;
+  --text: #F1F1F1;
+  --text-sub: #AAAAAA;
+  --text-light: #717171;
+  --border: #333333;
+  --shadow: 0 1px 6px rgba(0,0,0,0.3);
+  --shadow-lg: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+/* ============== Reset & Base ============== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding-bottom: calc(var(--tab-height) + 16px);
+  transition: background var(--transition), color var(--transition);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============== Header ============== */
+.header {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.header-left { display: flex; align-items: center; gap: 8px; }
+.header-logo { font-size: 22px; font-weight: 800; color: var(--red); }
+.header-logo span { color: var(--text); }
+.header-right { display: flex; align-items: center; gap: 12px; }
+.header-btn {
+  background: none; border: none; font-size: 20px; cursor: pointer;
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: background var(--transition);
+}
+.header-btn:hover { background: var(--border); }
+.auth-avatar { width: 28px; height: 28px; border-radius: 50%; }
+
+/* ============== Sections & Tabs ============== */
+.section { display: none; padding: 16px; }
+.section.active { display: block; }
+.tab-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tab-bar-inner { display: flex; justify-content: space-around; height: var(--tab-height); }
+.tab {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; background: none; border: none; cursor: pointer;
+  color: var(--text-light); font-size: 10px; font-weight: 600;
+  transition: color var(--transition);
+}
+.tab.active { color: var(--red); }
+.tab-icon { font-size: 22px; }
+
+/* ============== Cards & Grid ============== */
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+}
+.video-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  position: relative;
+}
+.video-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.video-card.watched { opacity: 0.6; }
+.video-card .thumb-wrap {
+  position: relative; width: 100%; padding-top: 56.25%; overflow: hidden;
+  background: #000;
+}
+.video-card .thumb-wrap img {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover;
+}
+.video-card .watched-badge {
+  position: absolute; top: 6px; right: 6px;
+  background: var(--success); color: #fff;
+  font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700;
+}
+.video-card .card-info { padding: 10px; }
+.video-card .card-title {
+  font-size: 13px; font-weight: 600; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.video-card .card-channel { font-size: 11px; color: var(--text-sub); margin-top: 4px; }
+.video-card .card-actions {
+  display: flex; gap: 4px; margin-top: 6px;
+}
+.video-card .card-actions button {
+  background: none; border: 1px solid var(--border); border-radius: 4px;
+  font-size: 11px; padding: 2px 6px; cursor: pointer; color: var(--text-sub);
+}
+.video-card .card-actions button:hover { background: var(--border); }
+
+/* ============== Channel List ============== */
+.channel-list { display: flex; flex-direction: column; gap: 12px; }
+.channel-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+  display: flex; align-items: center; gap: 12px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.channel-card:hover { transform: translateY(-1px); }
+.channel-card img {
+  width: 48px; height: 48px; border-radius: 50%; object-fit: cover;
+  background: var(--border);
+}
+.channel-card .ch-info { flex: 1; }
+.channel-card .ch-name { font-size: 15px; font-weight: 600; }
+.channel-card .ch-sub { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+.channel-card .ch-actions { display: flex; gap: 6px; }
+.channel-card .ch-actions button {
+  background: none; border: none; font-size: 18px; cursor: pointer;
+  padding: 4px;
+}
+
+/* ============== Channel Videos Overlay ============== */
+.channel-videos-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 200;
+  background: var(--bg);
+  overflow-y: auto;
+  animation: slideInRight 0.25s ease;
+}
+@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.channel-videos-header {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.channel-videos-header .back-btn {
+  background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text);
+}
+.channel-videos-header .ch-title { font-size: 16px; font-weight: 700; flex: 1; }
+.channel-videos-body { padding: 16px; }
+
+/* ============== Player ============== */
+.player-container { max-width: 800px; margin: 0 auto; }
+.player-wrap {
+  position: relative; width: 100%; padding-top: 56.25%;
+  background: #000; border-radius: var(--radius); overflow: hidden;
+}
+.player-wrap iframe, .player-wrap #yt-player {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  border: none;
+}
+.player-placeholder {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #888; font-size: 14px; gap: 12px;
+}
+.player-placeholder .icon { font-size: 48px; }
+.player-info {
+  margin-top: 16px; padding: 16px;
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.player-info .p-title { font-size: 16px; font-weight: 700; line-height: 1.4; }
+.player-info .p-channel { font-size: 13px; color: var(--text-sub); margin-top: 6px; }
+.player-info .p-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+/* ============== Buttons ============== */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 16px; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 600; border: none; cursor: pointer;
+  transition: all var(--transition);
+}
+.btn-primary { background: var(--red); color: #fff; }
+.btn-primary:hover { background: var(--red-dark); }
+.btn-secondary { background: var(--border); color: var(--text); }
+.btn-secondary:hover { opacity: 0.8; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-block { width: 100%; }
+.btn-danger { background: var(--danger); color: #fff; }
+
+/* ============== FAB ============== */
+.fab {
+  position: fixed;
+  bottom: calc(var(--tab-height) + 20px);
+  right: 20px;
+  width: 56px; height: 56px;
+  background: var(--red); color: #fff;
+  border: none; border-radius: 50%;
+  font-size: 28px; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(255,0,0,0.3);
+  z-index: 90;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.fab:hover { transform: scale(1.05); box-shadow: 0 6px 16px rgba(255,0,0,0.4); }
+
+/* ============== Category Chips ============== */
+.chip-bar {
+  display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 12px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.chip-bar::-webkit-scrollbar { display: none; }
+.chip {
+  flex-shrink: 0;
+  padding: 6px 14px; border-radius: 20px;
+  font-size: 13px; font-weight: 600;
+  background: var(--card); color: var(--text-sub);
+  border: 1px solid var(--border);
+  cursor: pointer; white-space: nowrap;
+  transition: all var(--transition);
+}
+.chip.active { background: var(--text); color: var(--card); border-color: var(--text); }
+
+/* ============== Search ============== */
+.search-bar {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 20px; padding: 8px 14px; margin-bottom: 12px;
+}
+.search-bar input {
+  flex: 1; border: none; outline: none; background: none;
+  font-size: 14px; color: var(--text);
+}
+.search-bar .clear-btn {
+  background: none; border: none; cursor: pointer; font-size: 16px; color: var(--text-light);
+  display: none;
+}
+.search-bar .clear-btn.show { display: block; }
+
+/* ============== Modal ============== */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 300;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+  background: var(--card); border-radius: var(--radius);
+  padding: 24px; width: 100%; max-width: 480px; max-height: 85vh; overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+.modal h3 { font-size: 18px; margin-bottom: 16px; }
+.modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+.modal-actions .btn { flex: 1; }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-sub); margin-bottom: 6px; }
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 14px; background: var(--bg);
+  color: var(--text); outline: none;
+}
+.form-group input:focus { border-color: var(--red); }
+
+/* ============== Empty State ============== */
+.empty-state {
+  text-align: center; padding: 48px 24px; color: var(--text-light);
+}
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state .title { font-size: 16px; font-weight: 700; color: var(--text-sub); margin-bottom: 6px; }
+.empty-state .desc { font-size: 13px; line-height: 1.5; }
+
+/* ============== Login Banner ============== */
+.login-banner {
+  background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 16px; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.login-banner .info { flex: 1; }
+.login-banner .info .title { font-size: 14px; font-weight: 700; }
+.login-banner .info .desc { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+
+/* ============== Sync Status ============== */
+.sync-status {
+  font-size: 11px; color: var(--text-light); display: none;
+  align-items: center; gap: 4px;
+}
+.sync-status.show { display: flex; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.sync-status .spinner { animation: spin 1s linear infinite; display: inline-block; }
+
+/* ============== PWA Install Banner ============== */
+.pwa-install-banner {
+  position: fixed; bottom: calc(var(--tab-height) + 8px); left: 50%;
+  transform: translateX(-50%) translateY(120px);
+  background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+  max-width: 360px; width: calc(100% - 32px); z-index: 95;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.pwa-install-banner.show { transform: translateX(-50%) translateY(0); }
+.pwa-install-banner .pwa-text { flex: 1; }
+.pwa-install-banner .pwa-text .title { font-size: 13px; font-weight: 700; }
+.pwa-install-banner .pwa-text .desc { font-size: 11px; color: var(--text-sub); }
+.pwa-install-banner .pwa-actions { display: flex; align-items: center; gap: 6px; }
+.pwa-install-banner .close-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-light); }
+
+/* ============== Settings ============== */
+.settings-group { margin-bottom: 20px; }
+.settings-group .group-title { font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; margin-bottom: 10px; }
+.settings-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+}
+.settings-row .label { font-size: 14px; font-weight: 500; }
+.settings-row .sublabel { font-size: 12px; color: var(--text-sub); }
+.toggle {
+  position: relative; width: 44px; height: 24px;
+  background: var(--border); border-radius: 12px; cursor: pointer;
+  transition: background var(--transition);
+}
+.toggle.active { background: var(--red); }
+.toggle::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #fff; transition: transform var(--transition);
+}
+.toggle.active::after { transform: translateX(20px); }
+
+/* ============== API Key Guide ============== */
+.api-guide { font-size: 13px; line-height: 1.6; color: var(--text-sub); }
+.api-guide ol { padding-left: 20px; }
+.api-guide li { margin-bottom: 6px; }
+.api-guide code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+.api-guide a { color: var(--red); text-decoration: none; }
+.api-needed-banner {
+  background: var(--red-bg); border-radius: var(--radius); padding: 16px;
+  margin-bottom: 16px; text-align: center;
+}
+.api-needed-banner .title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+.api-needed-banner .desc { font-size: 12px; color: var(--text-sub); margin-bottom: 10px; }
+
+/* ============== Responsive ============== */
+@media (min-width: 640px) {
+  .video-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+}
+</style>
+</head>
+<body>
+
+<!-- ============== Header ============== -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-logo">My<span>Tube</span></div>
+    <div class="sync-status" id="sync-status">
+      <span class="sync-icon"></span>
+      <span class="sync-text"></span>
+    </div>
+  </div>
+  <div class="header-right">
+    <button class="header-btn" id="search-toggle-btn" onclick="toggleSearchBar()" title="검색">🔍</button>
+    <button class="header-btn" onclick="showSettingsModal()" data-i18n-title="header.settings">⚙️</button>
+    <button class="header-btn" id="auth-icon" onclick="handleAuthClick()">👤</button>
+  </div>
+</div>
+
+<!-- ============== Login Banner ============== -->
+<div id="login-banner-area"></div>
+
+<!-- ============== Section: Videos ============== -->
+<div id="sec-videos" class="section active">
+  <div class="search-bar" id="search-bar-videos" style="display:none;">
+    <span>🔍</span>
+    <input type="text" id="search-input-videos" data-i18n-placeholder="search.placeholder" placeholder="영상 검색..." oninput="onSearchVideos()">
+    <button class="clear-btn" id="search-clear-videos" onclick="clearSearchVideos()">✕</button>
+  </div>
+  <div class="chip-bar" id="category-chips-videos"></div>
+  <div class="video-grid" id="video-grid"></div>
+  <div id="videos-empty" class="empty-state" style="display:none;">
+    <div class="icon">📺</div>
+    <div class="title" data-i18n="videos.emptyTitle">아직 추가된 영상이 없어요</div>
+    <div class="desc" data-i18n="videos.emptyDesc">+ 버튼을 눌러 YouTube 영상을 추가하세요</div>
+  </div>
+</div>
+
+<!-- ============== Section: Channels ============== -->
+<div id="sec-channels" class="section">
+  <div class="search-bar" id="search-bar-channels" style="display:none;">
+    <span>🔍</span>
+    <input type="text" id="search-input-channels" data-i18n-placeholder="search.placeholder" placeholder="채널 검색..." oninput="onSearchChannels()">
+    <button class="clear-btn" id="search-clear-channels" onclick="clearSearchChannels()">✕</button>
+  </div>
+  <div id="api-needed-banner" class="api-needed-banner" style="display:none;">
+    <div class="title" data-i18n="channels.apiNeeded">YouTube API 키가 필요합니다</div>
+    <div class="desc" data-i18n="channels.apiDesc">채널 기능을 사용하려면 설정에서 API 키를 입력하세요</div>
+    <button class="btn btn-primary btn-sm" onclick="showSettingsModal()" data-i18n="channels.goSettings">설정으로 이동</button>
+  </div>
+  <div class="chip-bar" id="category-chips-channels"></div>
+  <div class="channel-list" id="channel-list"></div>
+  <div id="channels-empty" class="empty-state" style="display:none;">
+    <div class="icon">📡</div>
+    <div class="title" data-i18n="channels.emptyTitle">아직 추가된 채널이 없어요</div>
+    <div class="desc" data-i18n="channels.emptyDesc">+ 버튼을 눌러 YouTube 채널을 추가하세요</div>
+  </div>
+</div>
+
+<!-- ============== Section: Player ============== -->
+<div id="sec-player" class="section">
+  <div class="player-container">
+    <div class="player-wrap" id="player-wrap">
+      <div class="player-placeholder" id="player-placeholder">
+        <div class="icon">▶️</div>
+        <div data-i18n="player.placeholder">영상을 선택하면 여기서 재생됩니다</div>
+      </div>
+      <div id="yt-player-container"></div>
+    </div>
+    <div class="player-info" id="player-info" style="display:none;">
+      <div class="p-title" id="player-title"></div>
+      <div class="p-channel" id="player-channel"></div>
+      <div class="p-actions" id="player-actions"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== Channel Videos Overlay ============== -->
+<div id="channel-videos-overlay" class="channel-videos-overlay" style="display:none;">
+  <div class="channel-videos-header">
+    <button class="back-btn" onclick="closeChannelVideos()">←</button>
+    <div class="ch-title" id="channel-videos-title"></div>
+  </div>
+  <div class="channel-videos-body">
+    <div class="video-grid" id="channel-video-grid"></div>
+    <div id="channel-videos-loading" class="empty-state" style="display:none;">
+      <div class="icon">⏳</div>
+      <div class="title" data-i18n="channels.loading">영상을 불러오는 중...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============== FAB ============== -->
+<button class="fab" id="fab" onclick="onFabClick()">+</button>
+
+<!-- ============== Tab Bar ============== -->
+<div class="tab-bar">
+  <div class="tab-bar-inner">
+    <button class="tab active" data-tab="videos" onclick="switchTab('videos')">
+      <span class="tab-icon">📺</span><span data-i18n="tab.videos">내 영상</span>
+    </button>
+    <button class="tab" data-tab="channels" onclick="switchTab('channels')">
+      <span class="tab-icon">📡</span><span data-i18n="tab.channels">내 채널</span>
+    </button>
+    <button class="tab" data-tab="player" onclick="switchTab('player')">
+      <span class="tab-icon">▶️</span><span data-i18n="tab.player">플레이어</span>
+    </button>
+  </div>
+</div>
+
+<!-- ============== PWA Install Banners ============== -->
+<div class="pwa-install-banner" id="pwa-install-banner">
+  <div class="pwa-text">
+    <div class="title" data-i18n="pwa.install">MyTube 설치</div>
+    <div class="desc" data-i18n="pwa.installDesc">홈 화면에 추가하여 앱처럼 사용하세요</div>
+  </div>
+  <div class="pwa-actions">
+    <button class="btn btn-primary btn-sm" onclick="installPWA()" data-i18n="pwa.installBtn">설치</button>
+    <button class="close-btn" onclick="dismissInstallBanner()">✕</button>
+  </div>
+</div>
+<div class="pwa-install-banner" id="pwa-ios-banner">
+  <div class="pwa-text">
+    <div class="title" data-i18n="pwa.install">MyTube 설치</div>
+    <div class="desc" data-i18n="pwa.iosDesc">Safari 하단의 공유 버튼(□↑)을 누른 후 "홈 화면에 추가"를 선택하세요</div>
+  </div>
+  <div class="pwa-actions">
+    <button class="close-btn" onclick="dismissIOSBanner()">✕</button>
+  </div>
+</div>
+
+<!-- ============== Modal Container ============== -->
+<div id="modal-container"></div>
+
+<!-- ============== Firebase SDK ============== -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+<script>
+// ============================================================
+//  MyTube — Curated YouTube Viewer
+//  Version 1.0 | Bekking Studio
+// ============================================================
+
+// ============== i18n ==============
+const SUPPORTED_LANGS = ['ko', 'ja', 'en'];
+function detectLang() {
+  const nav = (navigator.language || 'en').toLowerCase();
+  if (nav.startsWith('ko')) return 'ko';
+  if (nav.startsWith('ja')) return 'ja';
+  return 'en';
+}
+let currentLang = detectLang();
+
+const TRANSLATIONS = {
+  ko: {
+    'app.title': 'MyTube',
+    'app.subtitle': '나만의 유튜브',
+    'tab.videos': '내 영상',
+    'tab.channels': '내 채널',
+    'tab.player': '플레이어',
+    'header.settings': '설정',
+    'search.placeholder': '검색...',
+    'videos.emptyTitle': '아직 추가된 영상이 없어요',
+    'videos.emptyDesc': '+ 버튼을 눌러 YouTube 영상을 추가하세요',
+    'videos.addTitle': '영상 추가',
+    'videos.urlPlaceholder': 'YouTube URL을 붙여넣으세요',
+    'videos.urlError': '올바른 YouTube URL이 아닙니다',
+    'videos.add': '추가',
+    'videos.cancel': '취소',
+    'videos.delete': '삭제',
+    'videos.markWatched': '시청완료',
+    'videos.markUnwatched': '시청안함',
+    'videos.play': '재생',
+    'videos.saveToMy': '내 영상에 저장',
+    'videos.saved': '✓ 저장됨',
+    'videos.alreadyExists': '이미 추가된 영상입니다',
+    'videos.added': '✓ 영상이 추가되었습니다',
+    'videos.deleted': '✓ 영상이 삭제되었습니다',
+    'channels.emptyTitle': '아직 추가된 채널이 없어요',
+    'channels.emptyDesc': '+ 버튼을 눌러 YouTube 채널을 추가하세요',
+    'channels.addTitle': '채널 추가',
+    'channels.urlPlaceholder': 'YouTube 채널 URL을 붙여넣으세요',
+    'channels.urlError': '올바른 YouTube 채널 URL이 아닙니다',
+    'channels.apiNeeded': 'YouTube API 키가 필요합니다',
+    'channels.apiDesc': '채널 기능을 사용하려면 설정에서 API 키를 입력하세요',
+    'channels.goSettings': '설정으로 이동',
+    'channels.loading': '영상을 불러오는 중...',
+    'channels.added': '✓ 채널이 추가되었습니다',
+    'channels.deleted': '✓ 채널이 삭제되었습니다',
+    'channels.alreadyExists': '이미 추가된 채널입니다',
+    'channels.fetchError': '채널 정보를 불러올 수 없습니다',
+    'channels.videosError': '영상 목록을 불러올 수 없습니다',
+    'channels.noApiKey': 'API 키를 먼저 설정해주세요',
+    'player.placeholder': '영상을 선택하면 여기서 재생됩니다',
+    'player.ended': '시청완료로 표시되었습니다',
+    'settings.title': '설정',
+    'settings.display': '화면',
+    'settings.darkMode': '다크 모드',
+    'settings.language': '언어',
+    'settings.youtube': 'YouTube',
+    'settings.apiKey': 'API 키',
+    'settings.apiKeyPlaceholder': 'YouTube Data API v3 키 입력',
+    'settings.apiKeyGuide': 'API 키 발급 방법',
+    'settings.shortsFilter': 'Shorts 필터링',
+    'settings.shortsFilterDesc': '60초 이하 영상 숨기기',
+    'settings.save': '저장',
+    'settings.close': '닫기',
+    'settings.account': '계정',
+    'settings.login': 'Google 로그인',
+    'settings.loginDesc': '기기 간 데이터 동기화',
+    'settings.logout': '로그아웃',
+    'settings.appInfo': '앱 정보',
+    'settings.version': '버전',
+    'settings.developer': '개발자',
+    'settings.feedback': '피드백',
+    'categories.title': '카테고리 관리',
+    'categories.add': '카테고리 추가',
+    'categories.name': '이름',
+    'categories.icon': '아이콘',
+    'categories.color': '색상',
+    'categories.all': '전체',
+    'categories.none': '미분류',
+    'categories.delete': '삭제',
+    'categories.save': '저장',
+    'categories.deleted': '✓ 카테고리가 삭제되었습니다',
+    'modal.confirmTitle': '확인',
+    'modal.confirm': '확인',
+    'modal.cancel': '취소',
+    'modal.confirmDelete': '정말 삭제하시겠습니까?',
+    'pwa.install': 'MyTube 설치',
+    'pwa.installDesc': '홈 화면에 추가하여 앱처럼 사용하세요',
+    'pwa.installBtn': '설치',
+    'pwa.iosDesc': 'Safari 하단의 공유 버튼(□↑)을 누른 후 "홈 화면에 추가"를 선택하세요',
+    'auth.loginBanner': 'Google 로그인으로 데이터를 백업하세요',
+    'auth.loginBannerDesc': '기기 변경 시에도 안전하게 보관됩니다',
+    'auth.confirmLogout': '로그아웃 하시겠습니까?',
+    'profile.title': '프로필',
+    'sync.syncing': '동기화 중...',
+    'sync.synced': '동기화 완료',
+    'sync.error': '동기화 오류',
+    'apiGuide.title': 'YouTube API 키 발급 방법',
+    'apiGuide.step1': 'Google Cloud Console (console.cloud.google.com)에 접속합니다',
+    'apiGuide.step2': '새 프로젝트를 만들거나 기존 프로젝트를 선택합니다',
+    'apiGuide.step3': '"API 및 서비스" → "라이브러리"에서 "YouTube Data API v3"를 검색하여 사용 설정합니다',
+    'apiGuide.step4': '"API 및 서비스" → "사용자 인증 정보"에서 "API 키"를 만듭니다',
+    'apiGuide.step5': '생성된 API 키를 복사하여 위 입력란에 붙여넣으세요',
+    'apiGuide.note': '※ 무료 할당량: 하루 10,000 units (채널 조회 1회 = 약 2 units)',
+    'toast.apiKeyValid': '✓ API 키가 유효합니다',
+    'toast.apiKeyInvalid': '✗ API 키가 유효하지 않습니다',
+    'toast.settingsSaved': '✓ 설정이 저장되었습니다',
+    'toast.categoryAdded': '✓ 카테고리가 추가되었습니다',
+  },
+  ja: {
+    'app.title': 'MyTube',
+    'app.subtitle': 'マイYouTube',
+    'tab.videos': 'マイ動画',
+    'tab.channels': 'マイチャンネル',
+    'tab.player': 'プレイヤー',
+    'header.settings': '設定',
+    'search.placeholder': '検索...',
+    'videos.emptyTitle': 'まだ動画がありません',
+    'videos.emptyDesc': '+ボタンを押してYouTube動画を追加しましょう',
+    'videos.addTitle': '動画を追加',
+    'videos.urlPlaceholder': 'YouTube URLを貼り付けてください',
+    'videos.urlError': '正しいYouTube URLではありません',
+    'videos.add': '追加',
+    'videos.cancel': 'キャンセル',
+    'videos.delete': '削除',
+    'videos.markWatched': '視聴済み',
+    'videos.markUnwatched': '未視聴',
+    'videos.play': '再生',
+    'videos.saveToMy': 'マイ動画に保存',
+    'videos.saved': '✓ 保存済み',
+    'videos.alreadyExists': 'すでに追加済みの動画です',
+    'videos.added': '✓ 動画が追加されました',
+    'videos.deleted': '✓ 動画が削除されました',
+    'channels.emptyTitle': 'まだチャンネルがありません',
+    'channels.emptyDesc': '+ボタンを押してYouTubeチャンネルを追加しましょう',
+    'channels.addTitle': 'チャンネルを追加',
+    'channels.urlPlaceholder': 'YouTubeチャンネルURLを貼り付けてください',
+    'channels.urlError': '正しいYouTubeチャンネルURLではありません',
+    'channels.apiNeeded': 'YouTube APIキーが必要です',
+    'channels.apiDesc': 'チャンネル機能を利用するには設定でAPIキーを入力してください',
+    'channels.goSettings': '設定へ移動',
+    'channels.loading': '動画を読み込み中...',
+    'channels.added': '✓ チャンネルが追加されました',
+    'channels.deleted': '✓ チャンネルが削除されました',
+    'channels.alreadyExists': 'すでに追加済みのチャンネルです',
+    'channels.fetchError': 'チャンネル情報を取得できません',
+    'channels.videosError': '動画リストを取得できません',
+    'channels.noApiKey': '先にAPIキーを設定してください',
+    'player.placeholder': '動画を選択するとここで再生されます',
+    'player.ended': '視聴済みに設定されました',
+    'settings.title': '設定',
+    'settings.display': '表示',
+    'settings.darkMode': 'ダークモード',
+    'settings.language': '言語',
+    'settings.youtube': 'YouTube',
+    'settings.apiKey': 'APIキー',
+    'settings.apiKeyPlaceholder': 'YouTube Data API v3キーを入力',
+    'settings.apiKeyGuide': 'APIキーの発行方法',
+    'settings.shortsFilter': 'Shortsフィルタリング',
+    'settings.shortsFilterDesc': '60秒以下の動画を非表示',
+    'settings.save': '保存',
+    'settings.close': '閉じる',
+    'settings.account': 'アカウント',
+    'settings.login': 'Googleログイン',
+    'settings.loginDesc': 'デバイス間データ同期',
+    'settings.logout': 'ログアウト',
+    'settings.appInfo': 'アプリ情報',
+    'settings.version': 'バージョン',
+    'settings.developer': '開発者',
+    'settings.feedback': 'フィードバック',
+    'categories.title': 'カテゴリ管理',
+    'categories.add': 'カテゴリ追加',
+    'categories.name': '名前',
+    'categories.icon': 'アイコン',
+    'categories.color': '色',
+    'categories.all': 'すべて',
+    'categories.none': '未分類',
+    'categories.delete': '削除',
+    'categories.save': '保存',
+    'categories.deleted': '✓ カテゴリが削除されました',
+    'modal.confirmTitle': '確認',
+    'modal.confirm': '確認',
+    'modal.cancel': 'キャンセル',
+    'modal.confirmDelete': '本当に削除しますか？',
+    'pwa.install': 'MyTubeをインストール',
+    'pwa.installDesc': 'ホーム画面に追加してアプリのように使いましょう',
+    'pwa.installBtn': 'インストール',
+    'pwa.iosDesc': 'Safari下部の共有ボタン(□↑)を押して「ホーム画面に追加」を選択してください',
+    'auth.loginBanner': 'Googleログインでデータをバックアップ',
+    'auth.loginBannerDesc': 'デバイス変更時も安全に保管されます',
+    'auth.confirmLogout': 'ログアウトしますか？',
+    'profile.title': 'プロフィール',
+    'sync.syncing': '同期中...',
+    'sync.synced': '同期完了',
+    'sync.error': '同期エラー',
+    'apiGuide.title': 'YouTube APIキーの発行方法',
+    'apiGuide.step1': 'Google Cloud Console (console.cloud.google.com) にアクセスします',
+    'apiGuide.step2': '新しいプロジェクトを作成するか、既存のプロジェクトを選択します',
+    'apiGuide.step3': '「APIとサービス」→「ライブラリ」で「YouTube Data API v3」を検索して有効にします',
+    'apiGuide.step4': '「APIとサービス」→「認証情報」で「APIキー」を作成します',
+    'apiGuide.step5': '生成されたAPIキーをコピーして上の入力欄に貼り付けてください',
+    'apiGuide.note': '※ 無料割当: 1日10,000 units（チャンネル照会1回 = 約2 units）',
+    'toast.apiKeyValid': '✓ APIキーは有効です',
+    'toast.apiKeyInvalid': '✗ APIキーが無効です',
+    'toast.settingsSaved': '✓ 設定が保存されました',
+    'toast.categoryAdded': '✓ カテゴリが追加されました',
+  },
+  en: {
+    'app.title': 'MyTube',
+    'app.subtitle': 'My Curated YouTube',
+    'tab.videos': 'My Videos',
+    'tab.channels': 'My Channels',
+    'tab.player': 'Player',
+    'header.settings': 'Settings',
+    'search.placeholder': 'Search...',
+    'videos.emptyTitle': 'No videos yet',
+    'videos.emptyDesc': 'Tap + to add a YouTube video',
+    'videos.addTitle': 'Add Video',
+    'videos.urlPlaceholder': 'Paste a YouTube URL',
+    'videos.urlError': 'Not a valid YouTube URL',
+    'videos.add': 'Add',
+    'videos.cancel': 'Cancel',
+    'videos.delete': 'Delete',
+    'videos.markWatched': 'Mark watched',
+    'videos.markUnwatched': 'Mark unwatched',
+    'videos.play': 'Play',
+    'videos.saveToMy': 'Save to My Videos',
+    'videos.saved': '✓ Saved',
+    'videos.alreadyExists': 'This video is already added',
+    'videos.added': '✓ Video added',
+    'videos.deleted': '✓ Video deleted',
+    'channels.emptyTitle': 'No channels yet',
+    'channels.emptyDesc': 'Tap + to add a YouTube channel',
+    'channels.addTitle': 'Add Channel',
+    'channels.urlPlaceholder': 'Paste a YouTube channel URL',
+    'channels.urlError': 'Not a valid YouTube channel URL',
+    'channels.apiNeeded': 'YouTube API Key required',
+    'channels.apiDesc': 'Enter an API key in Settings to use channel features',
+    'channels.goSettings': 'Go to Settings',
+    'channels.loading': 'Loading videos...',
+    'channels.added': '✓ Channel added',
+    'channels.deleted': '✓ Channel deleted',
+    'channels.alreadyExists': 'This channel is already added',
+    'channels.fetchError': 'Could not fetch channel info',
+    'channels.videosError': 'Could not load video list',
+    'channels.noApiKey': 'Please set your API key first',
+    'player.placeholder': 'Select a video to play here',
+    'player.ended': 'Marked as watched',
+    'settings.title': 'Settings',
+    'settings.display': 'Display',
+    'settings.darkMode': 'Dark Mode',
+    'settings.language': 'Language',
+    'settings.youtube': 'YouTube',
+    'settings.apiKey': 'API Key',
+    'settings.apiKeyPlaceholder': 'Enter YouTube Data API v3 key',
+    'settings.apiKeyGuide': 'How to get an API key',
+    'settings.shortsFilter': 'Filter Shorts',
+    'settings.shortsFilterDesc': 'Hide videos under 60 seconds',
+    'settings.save': 'Save',
+    'settings.close': 'Close',
+    'settings.account': 'Account',
+    'settings.login': 'Sign in with Google',
+    'settings.loginDesc': 'Sync data across devices',
+    'settings.logout': 'Sign out',
+    'settings.appInfo': 'App Info',
+    'settings.version': 'Version',
+    'settings.developer': 'Developer',
+    'settings.feedback': 'Feedback',
+    'categories.title': 'Manage Categories',
+    'categories.add': 'Add Category',
+    'categories.name': 'Name',
+    'categories.icon': 'Icon',
+    'categories.color': 'Color',
+    'categories.all': 'All',
+    'categories.none': 'Uncategorized',
+    'categories.delete': 'Delete',
+    'categories.save': 'Save',
+    'categories.deleted': '✓ Category deleted',
+    'modal.confirmTitle': 'Confirm',
+    'modal.confirm': 'Confirm',
+    'modal.cancel': 'Cancel',
+    'modal.confirmDelete': 'Are you sure you want to delete?',
+    'pwa.install': 'Install MyTube',
+    'pwa.installDesc': 'Add to home screen and use like an app',
+    'pwa.installBtn': 'Install',
+    'pwa.iosDesc': 'Tap the share button (□↑) in Safari and select "Add to Home Screen"',
+    'auth.loginBanner': 'Sign in with Google to back up your data',
+    'auth.loginBannerDesc': 'Your data stays safe across devices',
+    'auth.confirmLogout': 'Sign out?',
+    'profile.title': 'Profile',
+    'sync.syncing': 'Syncing...',
+    'sync.synced': 'Synced',
+    'sync.error': 'Sync error',
+    'apiGuide.title': 'How to get a YouTube API Key',
+    'apiGuide.step1': 'Go to Google Cloud Console (console.cloud.google.com)',
+    'apiGuide.step2': 'Create a new project or select an existing one',
+    'apiGuide.step3': 'Go to "APIs & Services" → "Library" and enable "YouTube Data API v3"',
+    'apiGuide.step4': 'Go to "APIs & Services" → "Credentials" and create an "API key"',
+    'apiGuide.step5': 'Copy the generated API key and paste it in the field above',
+    'apiGuide.note': '※ Free quota: 10,000 units/day (1 channel lookup ≈ 2 units)',
+    'toast.apiKeyValid': '✓ API key is valid',
+    'toast.apiKeyInvalid': '✗ API key is invalid',
+    'toast.settingsSaved': '✓ Settings saved',
+    'toast.categoryAdded': '✓ Category added',
+  }
+};
+
+function t(key, params) {
+  const str = TRANSLATIONS[currentLang]?.[key] || TRANSLATIONS['ko'][key] || key;
+  if (!params) return str;
+  return str.replace(/\{(\w+)\}/g, (_, k) => params[k] ?? `{${k}}`);
+}
+
+function applyStaticTranslations() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.getAttribute('data-i18n'));
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+  });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    el.title = t(el.getAttribute('data-i18n-title'));
+  });
+  document.documentElement.lang = currentLang;
+  document.title = 'MyTube - ' + t('app.subtitle');
+}
+
+// ============== Security Helpers ==============
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+}
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+function escAttr(s) {
+  return s.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+function sanitizeColor(c) {
+  return /^#[0-9A-Fa-f]{6}$/.test(c) ? c : null;
+}
+
+// ============== Data Model ==============
+let data = {
+  videos: {},
+  channels: {},
+  categories: {},
+  settings: { darkMode: false, language: null, shortsFilter: true, defaultView: 'grid' }
+};
+let activeTab = 'videos';
+let activeCategory = null;
+let currentVideoId = null;
+let searchQuery = '';
+let ytPlayer = null;
+let ytReady = false;
+
+// ============== Data Persistence ==============
+function loadData() {
+  try {
+    const raw = localStorage.getItem('myTube');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      data = { ...data, ...parsed };
+      if (!data.videos) data.videos = {};
+      if (!data.channels) data.channels = {};
+      if (!data.categories) data.categories = {};
+      if (!data.settings) data.settings = {};
+    }
+  } catch(e) { console.warn('localStorage load error', e); }
+}
+
+function saveData() {
+  try {
+    localStorage.setItem('myTube', JSON.stringify(data));
+    if (currentUser) debouncedSync();
+  } catch(e) { console.warn('localStorage save error', e); }
+}
+
+function getApiKey() {
+  return localStorage.getItem('myTubeApiKey') || '';
+}
+function setApiKey(key) {
+  localStorage.setItem('myTubeApiKey', key);
+}
+
+// ============== Toast ==============
+function showToast(msg, duration) {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    toast.style.cssText = [
+      'position:fixed', 'top:20px', 'left:50%',
+      'transform:translateX(-50%)',
+      'background:#333', 'color:#fff',
+      'padding:10px 20px', 'border-radius:10px',
+      'font-size:14px', 'font-weight:600',
+      'z-index:999', 'opacity:0',
+      'transition:opacity 0.3s',
+      'pointer-events:none'
+    ].join(';');
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  setTimeout(() => { toast.style.opacity = '0'; }, duration || 2000);
+}
+
+// ============== Modal ==============
+function showModal(html) {
+  document.getElementById('modal-container').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this)closeModal()">' +
+    '<div class="modal">' + html + '</div></div>';
+}
+function closeModal() {
+  document.getElementById('modal-container').innerHTML = '';
+}
+function showConfirm(msg, onConfirm) {
+  const html = '<div style="text-align:center;padding:8px 0;">' +
+    '<div style="font-size:32px;margin-bottom:8px;">⚠️</div>' +
+    '<h3>' + escHtml(t('modal.confirmTitle')) + '</h3>' +
+    '<p style="font-size:14px;color:var(--text-sub);margin:12px 0;">' + escHtml(msg) + '</p>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-secondary" onclick="closeModal()">' + escHtml(t('modal.cancel')) + '</button>' +
+    '<button class="btn btn-danger" id="confirm-yes-btn">' + escHtml(t('modal.confirm')) + '</button>' +
+    '</div></div>';
+  showModal(html);
+  document.getElementById('confirm-yes-btn').onclick = function() { closeModal(); onConfirm(); };
+}
+
+// ============== Tab Switching ==============
+const TAB_ORDER = ['videos', 'channels', 'player'];
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('sec-' + tab).classList.add('active');
+  const btn = document.querySelector('.tab[data-tab="' + tab + '"]');
+  if (btn) btn.classList.add('active');
+
+  // Show/hide FAB
+  const fab = document.getElementById('fab');
+  fab.style.display = (tab === 'player') ? 'none' : 'flex';
+
+  if (tab === 'videos') renderVideos();
+  if (tab === 'channels') renderChannels();
+}
+
+// Swipe gesture
+(function() {
+  let touchStartX = 0, touchStartY = 0;
+  document.addEventListener('touchstart', e => {
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].screenX - touchStartX;
+    const dy = e.changedTouches[0].screenY - touchStartY;
+    if (Math.abs(dx) < 50 || Math.abs(dy) > Math.abs(dx)) return;
+    const idx = TAB_ORDER.indexOf(activeTab);
+    if (idx === -1) return;
+    if (dx < 0 && idx < TAB_ORDER.length - 1) switchTab(TAB_ORDER[idx + 1]);
+    if (dx > 0 && idx > 0) switchTab(TAB_ORDER[idx - 1]);
+  }, { passive: true });
+})();
+
+// ============== Dark Mode ==============
+function toggleDarkMode() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', isDark ? '' : 'dark');
+  localStorage.setItem('myTubeDark', !isDark);
+  data.settings.darkMode = !isDark;
+}
+
+// ============== Search ==============
+function toggleSearchBar() {
+  const tab = activeTab;
+  const bar = document.getElementById('search-bar-' + tab);
+  if (!bar) return;
+  const isVisible = bar.style.display !== 'none';
+  bar.style.display = isVisible ? 'none' : 'flex';
+  if (!isVisible) {
+    bar.querySelector('input').focus();
+  } else {
+    bar.querySelector('input').value = '';
+    searchQuery = '';
+    if (tab === 'videos') renderVideos();
+    else if (tab === 'channels') renderChannels();
+  }
+}
+function onSearchVideos() {
+  searchQuery = document.getElementById('search-input-videos').value;
+  const clearBtn = document.getElementById('search-clear-videos');
+  clearBtn.classList.toggle('show', searchQuery.length > 0);
+  renderVideos();
+}
+function clearSearchVideos() {
+  document.getElementById('search-input-videos').value = '';
+  searchQuery = '';
+  document.getElementById('search-clear-videos').classList.remove('show');
+  renderVideos();
+}
+function onSearchChannels() {
+  searchQuery = document.getElementById('search-input-channels').value;
+  const clearBtn = document.getElementById('search-clear-channels');
+  clearBtn.classList.toggle('show', searchQuery.length > 0);
+  renderChannels();
+}
+function clearSearchChannels() {
+  document.getElementById('search-input-channels').value = '';
+  searchQuery = '';
+  document.getElementById('search-clear-channels').classList.remove('show');
+  renderChannels();
+}
+
+// ============== FAB ==============
+function onFabClick() {
+  if (activeTab === 'videos') showAddVideoModal();
+  else if (activeTab === 'channels') showAddChannelModal();
+}
+
+// ============== YouTube URL Parsing ==============
+function parseYouTubeVideoId(url) {
+  if (!url) return null;
+  url = url.trim();
+  let m;
+  // youtu.be/ID
+  m = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (m) return m[1];
+  // youtube.com/watch?v=ID
+  m = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (m) return m[1];
+  // youtube.com/embed/ID
+  m = url.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/);
+  if (m) return m[1];
+  // youtube.com/shorts/ID
+  m = url.match(/youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/);
+  if (m) return m[1];
+  // youtube.com/v/ID
+  m = url.match(/youtube\.com\/v\/([a-zA-Z0-9_-]{11})/);
+  if (m) return m[1];
+  // youtube.com/live/ID
+  m = url.match(/youtube\.com\/live\/([a-zA-Z0-9_-]{11})/);
+  if (m) return m[1];
+  // bare ID (11 chars)
+  if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
+  return null;
+}
+
+function parseYouTubeChannelInfo(url) {
+  if (!url) return null;
+  url = url.trim();
+  let m;
+  // /channel/UCxxxx
+  m = url.match(/youtube\.com\/channel\/(UC[a-zA-Z0-9_-]+)/);
+  if (m) return { type: 'id', value: m[1] };
+  // /@handle
+  m = url.match(/youtube\.com\/@([a-zA-Z0-9_.-]+)/);
+  if (m) return { type: 'handle', value: m[1] };
+  // /c/name or /user/name
+  m = url.match(/youtube\.com\/(?:c|user)\/([a-zA-Z0-9_.-]+)/);
+  if (m) return { type: 'custom', value: m[1] };
+  // bare @handle
+  if (url.startsWith('@')) return { type: 'handle', value: url.substring(1) };
+  return null;
+}
+
+function getVideoThumbnail(videoId) {
+  return 'https://i.ytimg.com/vi/' + videoId + '/mqdefault.jpg';
+}
+
+// ============== Videos Tab ==============
+function showAddVideoModal() {
+  const html = '<h3>' + escHtml(t('videos.addTitle')) + '</h3>' +
+    '<div class="form-group">' +
+    '<label>YouTube URL</label>' +
+    '<input type="text" id="add-video-url" placeholder="' + escAttr(t('videos.urlPlaceholder')) + '" autofocus>' +
+    '<div id="add-video-error" style="color:var(--danger);font-size:12px;margin-top:4px;display:none;"></div>' +
+    '</div>' +
+    '<div id="add-video-preview" style="display:none;margin-bottom:12px;"></div>' +
+    '<div class="form-group">' +
+    '<label>' + escHtml(t('categories.title')) + '</label>' +
+    '<select id="add-video-category">' + getCategoryOptions() + '</select>' +
+    '</div>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-secondary" onclick="closeModal()">' + escHtml(t('videos.cancel')) + '</button>' +
+    '<button class="btn btn-primary" id="add-video-btn">' + escHtml(t('videos.add')) + '</button>' +
+    '</div>';
+  showModal(html);
+
+  const urlInput = document.getElementById('add-video-url');
+  urlInput.addEventListener('input', function() {
+    const videoId = parseYouTubeVideoId(this.value);
+    const preview = document.getElementById('add-video-preview');
+    const error = document.getElementById('add-video-error');
+    if (videoId) {
+      error.style.display = 'none';
+      preview.style.display = 'block';
+      preview.innerHTML = '<img src="' + getVideoThumbnail(videoId) + '" style="width:100%;border-radius:8px;" alt="thumbnail">';
+    } else {
+      preview.style.display = 'none';
+      if (this.value.trim().length > 5) {
+        error.textContent = t('videos.urlError');
+        error.style.display = 'block';
+      } else {
+        error.style.display = 'none';
+      }
+    }
+  });
+
+  document.getElementById('add-video-btn').onclick = function() {
+    addVideoFromUrl(urlInput.value, document.getElementById('add-video-category').value);
+  };
+}
+
+function addVideoFromUrl(url, categoryId) {
+  const videoId = parseYouTubeVideoId(url);
+  if (!videoId) {
+    showToast(t('videos.urlError'));
+    return;
+  }
+  // Check duplicate
+  const existing = Object.values(data.videos).find(v => v.videoId === videoId);
+  if (existing) {
+    showToast(t('videos.alreadyExists'));
+    return;
+  }
+
+  const id = generateId();
+  data.videos[id] = {
+    videoId: videoId,
+    title: '',
+    thumbnail: getVideoThumbnail(videoId),
+    channelTitle: '',
+    addedAt: Date.now(),
+    categoryId: categoryId || null,
+    watched: false
+  };
+
+  // Try to get video info via oEmbed (no API key needed)
+  fetchVideoInfo(id, videoId);
+
+  saveData();
+  closeModal();
+  renderVideos();
+  showToast(t('videos.added'));
+}
+
+async function fetchVideoInfo(id, videoId) {
+  try {
+    const resp = await fetch('https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=' + videoId + '&format=json');
+    if (resp.ok) {
+      const info = await resp.json();
+      if (data.videos[id]) {
+        data.videos[id].title = info.title || '';
+        data.videos[id].channelTitle = info.author_name || '';
+        saveData();
+        renderVideos();
+      }
+    }
+  } catch(e) { /* ignore — thumbnail still shows */ }
+}
+
+function renderVideos() {
+  const grid = document.getElementById('video-grid');
+  const empty = document.getElementById('videos-empty');
+  const videos = Object.entries(data.videos)
+    .map(([id, v]) => ({ id, ...v }))
+    .filter(v => {
+      if (activeCategory && v.categoryId !== activeCategory) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        return (v.title || '').toLowerCase().includes(q) || (v.channelTitle || '').toLowerCase().includes(q);
+      }
+      return true;
+    })
+    .sort((a, b) => b.addedAt - a.addedAt);
+
+  renderCategoryChips('videos');
+
+  if (videos.length === 0) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  grid.innerHTML = videos.map(v => {
+    const title = escHtml(v.title || v.videoId);
+    const channel = escHtml(v.channelTitle || '');
+    return '<div class="video-card' + (v.watched ? ' watched' : '') + '" onclick="playVideo(\'' + escAttr(v.id) + '\')">' +
+      '<div class="thumb-wrap">' +
+      '<img src="' + escHtml(v.thumbnail) + '" alt="" loading="lazy">' +
+      (v.watched ? '<div class="watched-badge">' + escHtml(t('videos.markWatched')) + '</div>' : '') +
+      '</div>' +
+      '<div class="card-info">' +
+      '<div class="card-title">' + title + '</div>' +
+      (channel ? '<div class="card-channel">' + channel + '</div>' : '') +
+      '<div class="card-actions">' +
+      '<button onclick="event.stopPropagation();toggleWatched(\'' + escAttr(v.id) + '\')">' +
+      (v.watched ? '↩' : '✓') + '</button>' +
+      '<button onclick="event.stopPropagation();deleteVideo(\'' + escAttr(v.id) + '\')">🗑</button>' +
+      '</div></div></div>';
+  }).join('');
+}
+
+function toggleWatched(id) {
+  if (data.videos[id]) {
+    data.videos[id].watched = !data.videos[id].watched;
+    saveData();
+    renderVideos();
+  }
+}
+
+function deleteVideo(id) {
+  showConfirm(t('modal.confirmDelete'), () => {
+    delete data.videos[id];
+    saveData();
+    renderVideos();
+    showToast(t('videos.deleted'));
+  });
+}
+
+// ============== Player Tab ==============
+function loadYouTubeAPI() {
+  if (window.YT && window.YT.Player) { ytReady = true; return; }
+  const tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(tag);
+}
+
+window.onYouTubeIframeAPIReady = function() {
+  ytReady = true;
+};
+
+function playVideo(id) {
+  const v = data.videos[id];
+  if (!v) return;
+  currentVideoId = id;
+  switchTab('player');
+
+  const placeholder = document.getElementById('player-placeholder');
+  const container = document.getElementById('yt-player-container');
+  const info = document.getElementById('player-info');
+
+  placeholder.style.display = 'none';
+  info.style.display = 'block';
+
+  document.getElementById('player-title').textContent = v.title || v.videoId;
+  document.getElementById('player-channel').textContent = v.channelTitle || '';
+
+  const actionsHtml =
+    '<button class="btn btn-sm ' + (v.watched ? 'btn-secondary' : 'btn-primary') + '" onclick="toggleCurrentWatched()">' +
+    escHtml(v.watched ? t('videos.markUnwatched') : t('videos.markWatched')) + '</button>';
+  document.getElementById('player-actions').innerHTML = actionsHtml;
+
+  if (ytReady) {
+    createPlayer(v.videoId);
+  } else {
+    // Wait for API
+    container.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + v.videoId +
+      '?rel=0&playsinline=1&modestbranding=1&autoplay=1" allowfullscreen allow="autoplay"></iframe>';
+  }
+}
+
+function playVideoById(videoId, title, channel) {
+  // Play without saving to data.videos
+  currentVideoId = null;
+  switchTab('player');
+
+  const placeholder = document.getElementById('player-placeholder');
+  const info = document.getElementById('player-info');
+  placeholder.style.display = 'none';
+  info.style.display = 'block';
+
+  document.getElementById('player-title').textContent = title || videoId;
+  document.getElementById('player-channel').textContent = channel || '';
+  document.getElementById('player-actions').innerHTML =
+    '<button class="btn btn-sm btn-primary" onclick="saveChannelVideoToMyVideos(\'' + escAttr(videoId) + '\',\'' +
+    escAttr(title || '') + '\',\'' + escAttr(channel || '') + '\')">' + escHtml(t('videos.saveToMy')) + '</button>';
+
+  if (ytReady) {
+    createPlayer(videoId);
+  } else {
+    document.getElementById('yt-player-container').innerHTML =
+      '<iframe src="https://www.youtube-nocookie.com/embed/' + videoId +
+      '?rel=0&playsinline=1&modestbranding=1&autoplay=1" allowfullscreen allow="autoplay"></iframe>';
+  }
+}
+
+function createPlayer(videoId) {
+  const container = document.getElementById('yt-player-container');
+  container.innerHTML = '<div id="yt-player-div"></div>';
+
+  ytPlayer = new YT.Player('yt-player-div', {
+    videoId: videoId,
+    playerVars: {
+      rel: 0,
+      playsinline: 1,
+      modestbranding: 1,
+      autoplay: 1
+    },
+    events: {
+      onStateChange: function(event) {
+        if (event.data === YT.PlayerState.ENDED) {
+          onVideoEnded();
+        }
+      }
+    }
+  });
+}
+
+function onVideoEnded() {
+  if (currentVideoId && data.videos[currentVideoId] && !data.videos[currentVideoId].watched) {
+    data.videos[currentVideoId].watched = true;
+    saveData();
+    showToast(t('player.ended'));
+    // Update player UI
+    const actionsHtml =
+      '<button class="btn btn-sm btn-secondary" onclick="toggleCurrentWatched()">' +
+      escHtml(t('videos.markUnwatched')) + '</button>';
+    document.getElementById('player-actions').innerHTML = actionsHtml;
+  }
+}
+
+function toggleCurrentWatched() {
+  if (currentVideoId && data.videos[currentVideoId]) {
+    data.videos[currentVideoId].watched = !data.videos[currentVideoId].watched;
+    saveData();
+    const v = data.videos[currentVideoId];
+    const actionsHtml =
+      '<button class="btn btn-sm ' + (v.watched ? 'btn-secondary' : 'btn-primary') + '" onclick="toggleCurrentWatched()">' +
+      escHtml(v.watched ? t('videos.markUnwatched') : t('videos.markWatched')) + '</button>';
+    document.getElementById('player-actions').innerHTML = actionsHtml;
+  }
+}
+
+function saveChannelVideoToMyVideos(videoId, title, channel) {
+  const existing = Object.values(data.videos).find(v => v.videoId === videoId);
+  if (existing) {
+    showToast(t('videos.alreadyExists'));
+    return;
+  }
+  const id = generateId();
+  data.videos[id] = {
+    videoId: videoId,
+    title: title,
+    thumbnail: getVideoThumbnail(videoId),
+    channelTitle: channel,
+    addedAt: Date.now(),
+    categoryId: null,
+    watched: false
+  };
+  saveData();
+  showToast(t('videos.saved'));
+  // Update button
+  document.getElementById('player-actions').innerHTML =
+    '<button class="btn btn-sm btn-secondary" disabled>' + escHtml(t('videos.saved')) + '</button>';
+}
+
+// ============== Channels Tab ==============
+function showAddChannelModal() {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    showToast(t('channels.noApiKey'));
+    showSettingsModal();
+    return;
+  }
+  const html = '<h3>' + escHtml(t('channels.addTitle')) + '</h3>' +
+    '<div class="form-group">' +
+    '<label>YouTube Channel URL</label>' +
+    '<input type="text" id="add-channel-url" placeholder="' + escAttr(t('channels.urlPlaceholder')) + '" autofocus>' +
+    '<div id="add-channel-error" style="color:var(--danger);font-size:12px;margin-top:4px;display:none;"></div>' +
+    '</div>' +
+    '<div class="form-group">' +
+    '<label>' + escHtml(t('categories.title')) + '</label>' +
+    '<select id="add-channel-category">' + getCategoryOptions() + '</select>' +
+    '</div>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-secondary" onclick="closeModal()">' + escHtml(t('videos.cancel')) + '</button>' +
+    '<button class="btn btn-primary" id="add-channel-btn">' + escHtml(t('videos.add')) + '</button>' +
+    '</div>';
+  showModal(html);
+
+  document.getElementById('add-channel-btn').onclick = function() {
+    const url = document.getElementById('add-channel-url').value;
+    const cat = document.getElementById('add-channel-category').value;
+    addChannelFromUrl(url, cat);
+  };
+}
+
+async function addChannelFromUrl(url, categoryId) {
+  const info = parseYouTubeChannelInfo(url);
+  if (!info) {
+    const error = document.getElementById('add-channel-error');
+    if (error) {
+      error.textContent = t('channels.urlError');
+      error.style.display = 'block';
+    }
+    return;
+  }
+
+  const apiKey = getApiKey();
+  if (!apiKey) { showToast(t('channels.noApiKey')); return; }
+
+  try {
+    let channelData;
+    if (info.type === 'id') {
+      channelData = await fetchChannelById(info.value, apiKey);
+    } else if (info.type === 'handle') {
+      channelData = await fetchChannelByHandle(info.value, apiKey);
+    } else {
+      channelData = await fetchChannelByCustom(info.value, apiKey);
+    }
+
+    if (!channelData) {
+      showToast(t('channels.fetchError'));
+      return;
+    }
+
+    // Check duplicate
+    const existing = Object.values(data.channels).find(c => c.channelId === channelData.channelId);
+    if (existing) {
+      showToast(t('channels.alreadyExists'));
+      return;
+    }
+
+    const id = generateId();
+    data.channels[id] = {
+      channelId: channelData.channelId,
+      title: channelData.title,
+      thumbnail: channelData.thumbnail,
+      uploadsPlaylistId: channelData.uploadsPlaylistId,
+      addedAt: Date.now(),
+      categoryId: categoryId || null,
+      cachedVideos: null
+    };
+
+    saveData();
+    closeModal();
+    renderChannels();
+    showToast(t('channels.added'));
+  } catch(e) {
+    console.warn('addChannel error:', e);
+    showToast(t('channels.fetchError'));
+  }
+}
+
+async function fetchChannelById(channelId, apiKey) {
+  const url = 'https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&id=' +
+    encodeURIComponent(channelId) + '&key=' + encodeURIComponent(apiKey);
+  const resp = await fetch(url);
+  if (!resp.ok) return null;
+  const json = await resp.json();
+  if (!json.items || json.items.length === 0) return null;
+  const item = json.items[0];
+  return {
+    channelId: item.id,
+    title: item.snippet.title,
+    thumbnail: item.snippet.thumbnails?.default?.url || '',
+    uploadsPlaylistId: item.contentDetails?.relatedPlaylists?.uploads || null
+  };
+}
+
+async function fetchChannelByHandle(handle, apiKey) {
+  const url = 'https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&forHandle=' +
+    encodeURIComponent(handle) + '&key=' + encodeURIComponent(apiKey);
+  const resp = await fetch(url);
+  if (!resp.ok) return null;
+  const json = await resp.json();
+  if (!json.items || json.items.length === 0) return null;
+  const item = json.items[0];
+  return {
+    channelId: item.id,
+    title: item.snippet.title,
+    thumbnail: item.snippet.thumbnails?.default?.url || '',
+    uploadsPlaylistId: item.contentDetails?.relatedPlaylists?.uploads || null
+  };
+}
+
+async function fetchChannelByCustom(customUrl, apiKey) {
+  // Search by custom URL — fallback via search
+  const url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=' +
+    encodeURIComponent(customUrl) + '&maxResults=1&key=' + encodeURIComponent(apiKey);
+  const resp = await fetch(url);
+  if (!resp.ok) return null;
+  const json = await resp.json();
+  if (!json.items || json.items.length === 0) return null;
+  const channelId = json.items[0].snippet.channelId;
+  return fetchChannelById(channelId, apiKey);
+}
+
+function renderChannels() {
+  const list = document.getElementById('channel-list');
+  const empty = document.getElementById('channels-empty');
+  const apiBanner = document.getElementById('api-needed-banner');
+  const apiKey = getApiKey();
+
+  renderCategoryChips('channels');
+
+  // Show API banner if no key
+  if (!apiKey && Object.keys(data.channels).length === 0) {
+    apiBanner.style.display = 'block';
+  } else {
+    apiBanner.style.display = 'none';
+  }
+
+  const channels = Object.entries(data.channels)
+    .map(([id, c]) => ({ id, ...c }))
+    .filter(c => {
+      if (activeCategory && c.categoryId !== activeCategory) return false;
+      if (searchQuery) {
+        return (c.title || '').toLowerCase().includes(searchQuery.toLowerCase());
+      }
+      return true;
+    })
+    .sort((a, b) => b.addedAt - a.addedAt);
+
+  if (channels.length === 0 && apiKey) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  list.innerHTML = channels.map(c => {
+    return '<div class="channel-card" onclick="openChannelVideos(\'' + escAttr(c.id) + '\')">' +
+      '<img src="' + escHtml(c.thumbnail || '') + '" alt="" loading="lazy">' +
+      '<div class="ch-info">' +
+      '<div class="ch-name">' + escHtml(c.title || c.channelId) + '</div>' +
+      '</div>' +
+      '<div class="ch-actions">' +
+      '<button onclick="event.stopPropagation();deleteChannel(\'' + escAttr(c.id) + '\')" title="' + escAttr(t('videos.delete')) + '">🗑</button>' +
+      '</div></div>';
+  }).join('');
+}
+
+function deleteChannel(id) {
+  showConfirm(t('modal.confirmDelete'), () => {
+    delete data.channels[id];
+    saveData();
+    renderChannels();
+    showToast(t('channels.deleted'));
+  });
+}
+
+async function openChannelVideos(id) {
+  const ch = data.channels[id];
+  if (!ch) return;
+
+  const overlay = document.getElementById('channel-videos-overlay');
+  const grid = document.getElementById('channel-video-grid');
+  const loading = document.getElementById('channel-videos-loading');
+  const title = document.getElementById('channel-videos-title');
+
+  overlay.style.display = 'block';
+  title.textContent = ch.title || ch.channelId;
+  grid.innerHTML = '';
+  loading.style.display = 'block';
+
+  const apiKey = getApiKey();
+  if (!apiKey || !ch.uploadsPlaylistId) {
+    loading.innerHTML = '<div class="icon">⚠️</div><div class="title">' + escHtml(t('channels.noApiKey')) + '</div>';
+    return;
+  }
+
+  try {
+    const videos = await fetchPlaylistVideos(ch.uploadsPlaylistId, apiKey);
+    loading.style.display = 'none';
+
+    if (!videos || videos.length === 0) {
+      grid.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div class="title">No videos found</div></div>';
+      return;
+    }
+
+    // Filter shorts if setting enabled
+    let filtered = videos;
+    if (data.settings.shortsFilter) {
+      filtered = videos.filter(v => !v.isShort);
+    }
+
+    grid.innerHTML = filtered.map(v => {
+      const title = escHtml(v.title || v.videoId);
+      const alreadySaved = Object.values(data.videos).some(mv => mv.videoId === v.videoId);
+      return '<div class="video-card" onclick="playVideoById(\'' + escAttr(v.videoId) + '\',\'' +
+        escAttr(v.title || '') + '\',\'' + escAttr(ch.title || '') + '\')">' +
+        '<div class="thumb-wrap">' +
+        '<img src="' + escHtml(v.thumbnail) + '" alt="" loading="lazy">' +
+        (alreadySaved ? '<div class="watched-badge">' + escHtml(t('videos.saved')) + '</div>' : '') +
+        '</div>' +
+        '<div class="card-info">' +
+        '<div class="card-title">' + title + '</div>' +
+        '<div class="card-actions">' +
+        '<button onclick="event.stopPropagation();saveChannelVideoToMyVideos(\'' + escAttr(v.videoId) + '\',\'' +
+        escAttr(v.title || '') + '\',\'' + escAttr(ch.title || '') + '\')">' +
+        (alreadySaved ? '✓' : '💾') + '</button>' +
+        '</div></div></div>';
+    }).join('');
+  } catch(e) {
+    console.warn('openChannelVideos error:', e);
+    loading.innerHTML = '<div class="icon">⚠️</div><div class="title">' + escHtml(t('channels.videosError')) + '</div>';
+  }
+}
+
+async function fetchPlaylistVideos(playlistId, apiKey) {
+  const url = 'https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=' +
+    encodeURIComponent(playlistId) + '&maxResults=20&key=' + encodeURIComponent(apiKey);
+  const resp = await fetch(url);
+  if (!resp.ok) return null;
+  const json = await resp.json();
+  if (!json.items) return null;
+
+  const videos = json.items.map(item => ({
+    videoId: item.contentDetails?.videoId || item.snippet?.resourceId?.videoId,
+    title: item.snippet?.title || '',
+    thumbnail: item.snippet?.thumbnails?.medium?.url || getVideoThumbnail(item.contentDetails?.videoId || ''),
+    publishedAt: item.snippet?.publishedAt,
+    isShort: false
+  })).filter(v => v.videoId);
+
+  // Check durations to detect Shorts (requires additional API call)
+  if (data.settings.shortsFilter && videos.length > 0) {
+    const videoIds = videos.map(v => v.videoId).join(',');
+    try {
+      const dUrl = 'https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=' +
+        encodeURIComponent(videoIds) + '&key=' + encodeURIComponent(apiKey);
+      const dResp = await fetch(dUrl);
+      if (dResp.ok) {
+        const dJson = await dResp.json();
+        const durMap = {};
+        (dJson.items || []).forEach(item => {
+          durMap[item.id] = parseDuration(item.contentDetails?.duration || '');
+        });
+        videos.forEach(v => {
+          if (durMap[v.videoId] !== undefined && durMap[v.videoId] <= 60) {
+            v.isShort = true;
+          }
+        });
+      }
+    } catch(e) { /* ignore, don't filter */ }
+  }
+
+  return videos;
+}
+
+function parseDuration(iso) {
+  // Parse ISO 8601 duration PT1H2M3S
+  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!m) return 0;
+  return (parseInt(m[1] || 0) * 3600) + (parseInt(m[2] || 0) * 60) + parseInt(m[3] || 0);
+}
+
+function closeChannelVideos() {
+  document.getElementById('channel-videos-overlay').style.display = 'none';
+}
+
+// ============== Categories ==============
+const CATEGORY_ICONS = ['📚', '💼', '🎮', '🎵', '🍳', '💪', '🔬', '🎨', '💰', '🌍', '🧘', '📱', '🎬', '✈️', '🐾', '🏠'];
+const CATEGORY_COLORS = ['#FF0000', '#FF6B35', '#FFB800', '#00B894', '#0984E3', '#6C5CE7', '#FD79A8', '#636E72'];
+
+function getCategoryOptions() {
+  let opts = '<option value="">' + escHtml(t('categories.none')) + '</option>';
+  Object.entries(data.categories).forEach(([id, cat]) => {
+    opts += '<option value="' + escAttr(id) + '">' + escHtml((cat.icon || '') + ' ' + cat.name) + '</option>';
+  });
+  return opts;
+}
+
+function renderCategoryChips(tab) {
+  const container = document.getElementById('category-chips-' + tab);
+  if (!container) return;
+  const cats = Object.entries(data.categories);
+  if (cats.length === 0) { container.innerHTML = ''; return; }
+
+  let html = '<div class="chip' + (!activeCategory ? ' active' : '') + '" onclick="filterCategory(null)">' +
+    escHtml(t('categories.all')) + '</div>';
+  cats.forEach(([id, cat]) => {
+    html += '<div class="chip' + (activeCategory === id ? ' active' : '') + '" onclick="filterCategory(\'' + escAttr(id) + '\')">' +
+      escHtml((cat.icon || '') + ' ' + cat.name) + '</div>';
+  });
+  // Manage button
+  html += '<div class="chip" onclick="showCategoriesModal()" style="border-style:dashed;">+ ' + escHtml(t('categories.add')) + '</div>';
+  container.innerHTML = html;
+}
+
+function filterCategory(catId) {
+  activeCategory = catId;
+  if (activeTab === 'videos') renderVideos();
+  else if (activeTab === 'channels') renderChannels();
+}
+
+function showCategoriesModal() {
+  let catListHtml = '';
+  Object.entries(data.categories).forEach(([id, cat]) => {
+    catListHtml += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">' +
+      '<span style="font-size:20px;">' + escHtml(cat.icon || '📁') + '</span>' +
+      '<span style="flex:1;font-weight:600;">' + escHtml(cat.name) + '</span>' +
+      '<button class="btn btn-sm btn-danger" onclick="deleteCategory(\'' + escAttr(id) + '\')">' + escHtml(t('categories.delete')) + '</button>' +
+      '</div>';
+  });
+
+  const html = '<h3>' + escHtml(t('categories.title')) + '</h3>' +
+    '<div id="cat-list">' + (catListHtml || '<div style="color:var(--text-light);padding:12px 0;">No categories</div>') + '</div>' +
+    '<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">' +
+    '<div class="form-group">' +
+    '<label>' + escHtml(t('categories.name')) + '</label>' +
+    '<input type="text" id="new-cat-name" placeholder="e.g. Study">' +
+    '</div>' +
+    '<div class="form-group">' +
+    '<label>' + escHtml(t('categories.icon')) + '</label>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;" id="cat-icon-grid">' +
+    CATEGORY_ICONS.map((icon, i) =>
+      '<button style="font-size:20px;padding:6px;border:1px solid var(--border);border-radius:6px;background:' +
+      (i === 0 ? 'var(--red-bg)' : 'none') + ';cursor:pointer;" class="cat-icon-btn" data-icon="' + icon + '" onclick="selectCatIcon(this)">' +
+      icon + '</button>'
+    ).join('') +
+    '</div></div>' +
+    '<button class="btn btn-primary btn-block" onclick="addCategory()">' + escHtml(t('categories.add')) + '</button>' +
+    '</div>' +
+    '<div class="modal-actions" style="margin-top:12px;">' +
+    '<button class="btn btn-secondary btn-block" onclick="closeModal()">' + escHtml(t('settings.close')) + '</button>' +
+    '</div>';
+  showModal(html);
+}
+
+let selectedCatIcon = CATEGORY_ICONS[0];
+function selectCatIcon(btn) {
+  document.querySelectorAll('.cat-icon-btn').forEach(b => b.style.background = 'none');
+  btn.style.background = 'var(--red-bg)';
+  selectedCatIcon = btn.getAttribute('data-icon');
+}
+
+function addCategory() {
+  const name = document.getElementById('new-cat-name').value.trim();
+  if (!name) return;
+  const id = generateId();
+  data.categories[id] = { name, icon: selectedCatIcon, color: null };
+  saveData();
+  showToast(t('toast.categoryAdded'));
+  showCategoriesModal(); // refresh
+}
+
+function deleteCategory(id) {
+  delete data.categories[id];
+  // Remove from videos/channels
+  Object.values(data.videos).forEach(v => { if (v.categoryId === id) v.categoryId = null; });
+  Object.values(data.channels).forEach(c => { if (c.categoryId === id) c.categoryId = null; });
+  if (activeCategory === id) activeCategory = null;
+  saveData();
+  showToast(t('categories.deleted'));
+  showCategoriesModal(); // refresh
+}
+
+// ============== Settings Modal ==============
+function showSettingsModal() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const apiKey = getApiKey();
+  const shortsFilter = data.settings.shortsFilter !== false;
+
+  const html = '<h3>' + escHtml(t('settings.title')) + '</h3>' +
+
+    // Display
+    '<div class="settings-group">' +
+    '<div class="group-title">' + escHtml(t('settings.display')) + '</div>' +
+    '<div class="settings-row">' +
+    '<div><div class="label">' + escHtml(t('settings.darkMode')) + '</div></div>' +
+    '<div class="toggle' + (isDark ? ' active' : '') + '" id="toggle-dark" onclick="toggleSettingsDark()"></div>' +
+    '</div>' +
+    '<div class="settings-row">' +
+    '<div class="label">' + escHtml(t('settings.language')) + '</div>' +
+    '<select id="settings-lang" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--bg);color:var(--text);">' +
+    '<option value="ko"' + (currentLang === 'ko' ? ' selected' : '') + '>한국어</option>' +
+    '<option value="ja"' + (currentLang === 'ja' ? ' selected' : '') + '>日本語</option>' +
+    '<option value="en"' + (currentLang === 'en' ? ' selected' : '') + '>English</option>' +
+    '</select></div></div>' +
+
+    // YouTube
+    '<div class="settings-group">' +
+    '<div class="group-title">' + escHtml(t('settings.youtube')) + '</div>' +
+    '<div class="form-group">' +
+    '<label>' + escHtml(t('settings.apiKey')) + '</label>' +
+    '<input type="text" id="settings-api-key" value="' + escAttr(apiKey) + '" placeholder="' + escAttr(t('settings.apiKeyPlaceholder')) + '">' +
+    '<div style="margin-top:6px;"><a href="#" onclick="event.preventDefault();showApiGuide()" style="font-size:12px;color:var(--red);">' +
+    escHtml(t('settings.apiKeyGuide')) + ' →</a></div>' +
+    '</div>' +
+    '<div class="settings-row">' +
+    '<div><div class="label">' + escHtml(t('settings.shortsFilter')) + '</div>' +
+    '<div class="sublabel">' + escHtml(t('settings.shortsFilterDesc')) + '</div></div>' +
+    '<div class="toggle' + (shortsFilter ? ' active' : '') + '" id="toggle-shorts" onclick="toggleSettingsShorts()"></div>' +
+    '</div></div>' +
+
+    // Account
+    '<div class="settings-group">' +
+    '<div class="group-title">' + escHtml(t('settings.account')) + '</div>' +
+    (currentUser ?
+      '<div class="settings-row"><div class="label">' + escHtml(currentUser.displayName || currentUser.email || '') + '</div>' +
+      '<button class="btn btn-sm btn-secondary" onclick="signOutUser()">' + escHtml(t('settings.logout')) + '</button></div>'
+      :
+      '<div class="settings-row"><div><div class="label">' + escHtml(t('settings.login')) + '</div>' +
+      '<div class="sublabel">' + escHtml(t('settings.loginDesc')) + '</div></div>' +
+      '<button class="btn btn-sm btn-primary" onclick="closeModal();signInWithGoogle()">Google</button></div>'
+    ) +
+    '</div>' +
+
+    // App Info
+    '<div class="settings-group">' +
+    '<div class="group-title">' + escHtml(t('settings.appInfo')) + '</div>' +
+    '<div class="settings-row"><div class="label">' + escHtml(t('settings.version')) + '</div><div style="color:var(--text-sub);">v1.0</div></div>' +
+    '<div class="settings-row"><div class="label">' + escHtml(t('settings.developer')) + '</div><div style="color:var(--text-sub);">Bekking Studio</div></div>' +
+    '<div class="settings-row"><div class="label">' + escHtml(t('settings.feedback')) + '</div><div style="color:var(--text-sub);font-size:12px;">info.bekking@gmail.com</div></div>' +
+    '</div>' +
+
+    '<div class="modal-actions">' +
+    '<button class="btn btn-primary btn-block" onclick="saveSettings()">' + escHtml(t('settings.save')) + '</button>' +
+    '</div>';
+
+  showModal(html);
+}
+
+function toggleSettingsDark() {
+  const el = document.getElementById('toggle-dark');
+  el.classList.toggle('active');
+  toggleDarkMode();
+}
+
+function toggleSettingsShorts() {
+  document.getElementById('toggle-shorts').classList.toggle('active');
+}
+
+function saveSettings() {
+  // Language
+  const lang = document.getElementById('settings-lang').value;
+  if (SUPPORTED_LANGS.includes(lang)) {
+    currentLang = lang;
+    data.settings.language = lang;
+    applyStaticTranslations();
+  }
+
+  // API Key
+  const apiKey = document.getElementById('settings-api-key').value.trim();
+  setApiKey(apiKey);
+
+  // Shorts filter
+  data.settings.shortsFilter = document.getElementById('toggle-shorts').classList.contains('active');
+
+  saveData();
+  closeModal();
+  showToast(t('toast.settingsSaved'));
+
+  // Re-render all (including login banner for language change)
+  renderAll();
+}
+
+function showApiGuide() {
+  const html = '<h3>' + escHtml(t('apiGuide.title')) + '</h3>' +
+    '<div class="api-guide"><ol>' +
+    '<li>' + escHtml(t('apiGuide.step1')) + '</li>' +
+    '<li>' + escHtml(t('apiGuide.step2')) + '</li>' +
+    '<li>' + escHtml(t('apiGuide.step3')) + '</li>' +
+    '<li>' + escHtml(t('apiGuide.step4')) + '</li>' +
+    '<li>' + escHtml(t('apiGuide.step5')) + '</li>' +
+    '</ol>' +
+    '<p style="margin-top:10px;font-weight:600;">' + escHtml(t('apiGuide.note')) + '</p></div>' +
+    '<div class="modal-actions" style="margin-top:16px;">' +
+    '<button class="btn btn-secondary btn-block" onclick="showSettingsModal()">' + escHtml(t('settings.close')) + '</button>' +
+    '</div>';
+  showModal(html);
+}
+
+// ============== Firebase Auth + Firestore ==============
+const firebaseConfig = {
+  apiKey: "AIzaSyAt8f5u4NwEiSyp4syxY7iLf_FAO3tM8dk",
+  authDomain: "myroutine-bekking.firebaseapp.com",
+  projectId: "myroutine-bekking",
+  storageBucket: "myroutine-bekking.firebasestorage.app",
+  messagingSenderId: "75626230147",
+  appId: "1:75626230147:web:17485fe1a4be31fc3a86b6"
+};
+
+let firebaseReady = false;
+let currentUser = null;
+let syncTimer = null;
+let isSyncing = false;
+let lastSyncTime = null;
+
+try {
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  else firebase.app();
+  firebaseReady = true;
+} catch(e) { console.warn('Firebase init failed:', e); }
+
+const auth = firebaseReady ? firebase.auth() : null;
+const db = firebaseReady ? firebase.firestore() : null;
+
+function handleAuthClick() {
+  if (currentUser) showProfileModal();
+  else signInWithGoogle();
+}
+
+function signInWithGoogle() {
+  if (!auth) return;
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(err => {
+    console.warn('Google sign-in error:', err);
+    if (err.code === 'auth/popup-blocked') {
+      auth.signInWithRedirect(provider);
+    }
+  });
+}
+
+function signOutUser() {
+  if (!auth) return;
+  showConfirm(t('auth.confirmLogout'), () => {
+    auth.signOut().then(() => {
+      currentUser = null;
+      updateAuthUI(null);
+      updateSyncStatus('hidden');
+      renderLoginBanner();
+    });
+  });
+}
+
+function onAuthChanged(user) {
+  currentUser = user;
+  updateAuthUI(user);
+  if (user) { renderLoginBanner(); syncData(); }
+  else { updateSyncStatus('hidden'); renderLoginBanner(); }
+}
+
+function updateAuthUI(user) {
+  const iconEl = document.getElementById('auth-icon');
+  if (!iconEl) return;
+  if (user && user.photoURL) {
+    iconEl.textContent = '';
+    const img = document.createElement('img');
+    img.src = user.photoURL;
+    img.className = 'auth-avatar';
+    img.referrerPolicy = 'no-referrer';
+    iconEl.appendChild(img);
+  } else {
+    iconEl.textContent = '👤';
+  }
+}
+
+function showProfileModal() {
+  if (!currentUser) return;
+  const html = '<h3>' + escHtml(t('profile.title')) + '</h3>' +
+    '<div style="text-align:center;padding:16px 0;">' +
+    '<div style="font-size:48px;margin-bottom:8px;">👤</div>' +
+    '<div style="font-size:16px;font-weight:700;">' + escHtml(currentUser.displayName || '') + '</div>' +
+    '<div style="font-size:13px;color:var(--text-sub);">' + escHtml(currentUser.email || '') + '</div>' +
+    '</div>' +
+    '<div class="modal-actions">' +
+    '<button class="btn btn-secondary" onclick="closeModal()">' + escHtml(t('settings.close')) + '</button>' +
+    '<button class="btn btn-danger" onclick="closeModal();signOutUser()">' + escHtml(t('settings.logout')) + '</button>' +
+    '</div>';
+  showModal(html);
+}
+
+// ============== Sync ==============
+function debouncedSync() {
+  if (!currentUser || !db) return;
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => { syncToCloud(); }, 3000);
+}
+
+async function syncToCloud() {
+  if (!currentUser || !db || isSyncing) return;
+  isSyncing = true;
+  updateSyncStatus('syncing');
+  try {
+    const uid = currentUser.uid;
+    const userRef = db.collection('mytube-users').doc(uid);
+    const now = firebase.firestore.FieldValue.serverTimestamp();
+    await userRef.set({
+      videos: data.videos || {},
+      channels: data.channels || {},
+      categories: data.categories || {},
+      settings: data.settings || {},
+      lastSync: now
+    }, { merge: true });
+
+    lastSyncTime = Date.now();
+    localStorage.setItem('myTubeLastSync', String(lastSyncTime));
+    updateSyncStatus('synced');
+  } catch (err) {
+    console.warn('syncToCloud error:', err);
+    updateSyncStatus('error');
+  } finally {
+    isSyncing = false;
+  }
+}
+
+async function syncFromCloud() {
+  if (!currentUser || !db) return;
+  updateSyncStatus('syncing');
+  try {
+    const uid = currentUser.uid;
+    const doc = await db.collection('mytube-users').doc(uid).get();
+    if (doc.exists) {
+      const d = doc.data();
+      if (d.videos) data.videos = d.videos;
+      if (d.channels) data.channels = d.channels;
+      if (d.categories) data.categories = d.categories;
+      if (d.settings) data.settings = { ...data.settings, ...d.settings };
+    }
+    localStorage.setItem('myTube', JSON.stringify(data));
+    lastSyncTime = Date.now();
+    localStorage.setItem('myTubeLastSync', String(lastSyncTime));
+    updateSyncStatus('synced');
+  } catch (err) {
+    console.warn('syncFromCloud error:', err);
+    updateSyncStatus('error');
+  }
+}
+
+async function syncData() {
+  if (!currentUser || !db) return;
+  updateSyncStatus('syncing');
+  try {
+    const uid = currentUser.uid;
+    const doc = await db.collection('mytube-users').doc(uid).get();
+    const cloudExists = doc.exists && doc.data().lastSync;
+    const localHasData = Object.keys(data.videos).length > 0 || Object.keys(data.channels).length > 0;
+
+    if (!cloudExists && localHasData) await syncToCloud();
+    else if (cloudExists && !localHasData) { await syncFromCloud(); renderAll(); }
+    else if (cloudExists && localHasData) {
+      if (lastSyncTime) await syncToCloud();
+      else {
+        // First sync — prefer cloud
+        await syncFromCloud();
+        renderAll();
+      }
+    } else updateSyncStatus('synced');
+  } catch (err) {
+    console.warn('syncData error:', err);
+    updateSyncStatus('error');
+  }
+}
+
+function updateSyncStatus(status) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const icon = el.querySelector('.sync-icon');
+  const text = el.querySelector('.sync-text');
+  if (status === 'hidden') {
+    el.classList.remove('show');
+    return;
+  }
+  el.classList.add('show');
+  if (status === 'syncing') {
+    icon.textContent = '🔄';
+    icon.classList.add('spinner');
+    text.textContent = t('sync.syncing');
+  } else if (status === 'synced') {
+    icon.textContent = '✓';
+    icon.classList.remove('spinner');
+    text.textContent = t('sync.synced');
+    setTimeout(() => { el.classList.remove('show'); }, 3000);
+  } else if (status === 'error') {
+    icon.textContent = '⚠';
+    icon.classList.remove('spinner');
+    text.textContent = t('sync.error');
+  }
+}
+
+// ============== Login Banner ==============
+function renderLoginBanner() {
+  const area = document.getElementById('login-banner-area');
+  if (!area) return;
+  if (currentUser) {
+    area.innerHTML = '';
+    return;
+  }
+  area.innerHTML = '<div class="login-banner">' +
+    '<div class="info">' +
+    '<div class="title">' + escHtml(t('auth.loginBanner')) + '</div>' +
+    '<div class="desc">' + escHtml(t('auth.loginBannerDesc')) + '</div>' +
+    '</div>' +
+    '<button class="btn btn-primary btn-sm" onclick="signInWithGoogle()">Google</button>' +
+    '</div>';
+}
+
+// ============== PWA ==============
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  if (!localStorage.getItem('myTubePWADismissed')) {
+    document.getElementById('pwa-install-banner').classList.add('show');
+  }
+});
+window.addEventListener('appinstalled', () => {
+  document.getElementById('pwa-install-banner').classList.remove('show');
+});
+function installPWA() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+}
+function dismissInstallBanner() {
+  document.getElementById('pwa-install-banner').classList.remove('show');
+  localStorage.setItem('myTubePWADismissed', 'true');
+}
+function showIOSInstallBanner() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isStandalone = window.navigator.standalone === true;
+  if (isIOS && !isStandalone && !localStorage.getItem('myTubeIOSDismissed')) {
+    setTimeout(() => { document.getElementById('pwa-ios-banner').classList.add('show'); }, 2000);
+  }
+}
+function dismissIOSBanner() {
+  document.getElementById('pwa-ios-banner').classList.remove('show');
+  localStorage.setItem('myTubeIOSDismissed', 'true');
+}
+
+// ============== Render All ==============
+function renderAll() {
+  renderVideos();
+  renderChannels();
+  renderLoginBanner();
+}
+
+// ============== Init ==============
+function init() {
+  loadData();
+
+  // Apply saved language
+  if (data.settings.language && SUPPORTED_LANGS.includes(data.settings.language)) {
+    currentLang = data.settings.language;
+  }
+
+  lastSyncTime = parseInt(localStorage.getItem('myTubeLastSync')) || null;
+  applyStaticTranslations();
+
+  // Dark mode
+  if (localStorage.getItem('myTubeDark') === 'true') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+
+  renderAll();
+
+  // Firebase auth
+  if (auth) auth.onAuthStateChanged(onAuthChanged);
+  else renderLoginBanner();
+
+  // Load YouTube IFrame API
+  loadYouTubeAPI();
+
+  // iOS PWA banner
+  showIOSInstallBanner();
+
+  // Service Worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+}
+
+init();
+</script>
+</body>
+</html>
