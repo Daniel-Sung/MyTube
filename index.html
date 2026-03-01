@@ -1892,15 +1892,14 @@ function handleAuthClick() {
 function signInWithGoogle() {
   if (!auth) return;
   const provider = new firebase.auth.GoogleAuthProvider();
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if (isMobile) {
-    auth.signInWithRedirect(provider);
-  } else {
-    auth.signInWithPopup(provider).catch(err => {
-      console.warn('Google sign-in error:', err);
+  auth.signInWithPopup(provider).catch(err => {
+    console.warn('Google sign-in popup error:', err);
+    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
       auth.signInWithRedirect(provider);
-    });
-  }
+    } else {
+      showToast('로그인 실패: ' + (err.code || err.message));
+    }
+  });
 }
 
 function signOutUser() {
