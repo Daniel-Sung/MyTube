@@ -12,7 +12,7 @@
   script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com https://www.gstatic.com;
   style-src 'self' 'unsafe-inline';
   img-src 'self' data: https://i.ytimg.com https://yt3.ggpht.com https://yt3.googleusercontent.com https://lh3.googleusercontent.com https:;
-  connect-src 'self' https://*.googleapis.com https://*.google.com https://www.youtube.com;
+  connect-src 'self' https://*.googleapis.com https://*.google.com https://www.youtube.com https://api.allorigins.win https://corsproxy.io;
   font-src 'self';
   frame-src https://www.youtube.com https://www.youtube-nocookie.com https://*.firebaseapp.com;">
 <link rel="manifest" href="manifest.json">
@@ -396,12 +396,6 @@ body {
 .api-guide li { margin-bottom: 6px; }
 .api-guide code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
 .api-guide a { color: var(--red); text-decoration: none; }
-.api-needed-banner {
-  background: var(--red-bg); border-radius: var(--radius); padding: 16px;
-  margin-bottom: 16px; text-align: center;
-}
-.api-needed-banner .title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
-.api-needed-banner .desc { font-size: 12px; color: var(--text-sub); margin-bottom: 10px; }
 
 /* ============== Responsive ============== */
 @media (min-width: 640px) {
@@ -452,11 +446,6 @@ body {
     <span>🔍</span>
     <input type="text" id="search-input-channels" data-i18n-placeholder="search.placeholder" placeholder="채널 검색..." oninput="onSearchChannels()">
     <button class="clear-btn" id="search-clear-channels" onclick="clearSearchChannels()">✕</button>
-  </div>
-  <div id="api-needed-banner" class="api-needed-banner" style="display:none;">
-    <div class="title" data-i18n="channels.apiNeeded">YouTube API 키가 필요합니다</div>
-    <div class="desc" data-i18n="channels.apiDesc">채널 기능을 사용하려면 설정에서 API 키를 입력하세요</div>
-    <button class="btn btn-primary btn-sm" onclick="showSettingsModal()" data-i18n="channels.goSettings">설정으로 이동</button>
   </div>
   <div class="chip-bar" id="category-chips-channels"></div>
   <div class="channel-list" id="channel-list"></div>
@@ -1449,19 +1438,29 @@ function saveChannelVideoToMyVideos(videoId, title, channel) {
     '<button class="btn btn-sm btn-secondary" disabled>' + escHtml(t('videos.saved')) + '</button>';
 }
 
-// ============== Channels Tab ==============
-function showAddChannelModal() {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    showToast(t('channels.noApiKey'));
-    showSettingsModal();
-    return;
+// ============== CORS Proxy ==============
+const CORS_PROXIES = [
+  'https://corsproxy.io/?',
+  'https://api.allorigins.win/raw?url='
+];
+async function corsGet(url) {
+  for (const proxy of CORS_PROXIES) {
+    try {
+      const resp = await fetch(proxy + encodeURIComponent(url));
+      if (resp.ok) return await resp.text();
+    } catch(e) { /* try next */ }
   }
+  return null;
+}
+
+// ============== Channels Tab (RSS-based, no API key needed) ==============
+function showAddChannelModal() {
   const html = '<h3>' + escHtml(t('channels.addTitle')) + '</h3>' +
     '<div class="form-group">' +
     '<label>YouTube Channel URL</label>' +
     '<input type="text" id="add-channel-url" placeholder="' + escAttr(t('channels.urlPlaceholder')) + '" autofocus>' +
     '<div id="add-channel-error" style="color:var(--danger);font-size:12px;margin-top:4px;display:none;"></div>' +
+    '<div id="add-channel-loading" style="color:var(--text-sub);font-size:12px;margin-top:4px;display:none;">' + escHtml(t('channels.loading')) + '</div>' +
     '</div>' +
     '<div class="form-group">' +
     '<label>' + escHtml(t('categories.title')) + '</label>' +
@@ -1484,47 +1483,49 @@ async function addChannelFromUrl(url, categoryId) {
   const info = parseYouTubeChannelInfo(url);
   if (!info) {
     const error = document.getElementById('add-channel-error');
-    if (error) {
-      error.textContent = t('channels.urlError');
-      error.style.display = 'block';
-    }
+    if (error) { error.textContent = t('channels.urlError'); error.style.display = 'block'; }
     return;
   }
 
-  const apiKey = getApiKey();
-  if (!apiKey) { showToast(t('channels.noApiKey')); return; }
+  const loadingEl = document.getElementById('add-channel-loading');
+  const errorEl = document.getElementById('add-channel-error');
+  if (errorEl) errorEl.style.display = 'none';
+  if (loadingEl) loadingEl.style.display = 'block';
 
   try {
-    let channelData;
+    // Resolve channel ID if needed
+    let channelId;
     if (info.type === 'id') {
-      channelData = await fetchChannelById(info.value, apiKey);
-    } else if (info.type === 'handle') {
-      channelData = await fetchChannelByHandle(info.value, apiKey);
+      channelId = info.value;
     } else {
-      channelData = await fetchChannelByCustom(info.value, apiKey);
+      channelId = await resolveChannelId(info);
     }
 
-    if (!channelData) {
+    if (!channelId) {
+      if (loadingEl) loadingEl.style.display = 'none';
       showToast(t('channels.fetchError'));
       return;
     }
 
     // Check duplicate
-    const existing = Object.values(data.channels).find(c => c.channelId === channelData.channelId);
+    const existing = Object.values(data.channels).find(c => c.channelId === channelId);
     if (existing) {
+      if (loadingEl) loadingEl.style.display = 'none';
       showToast(t('channels.alreadyExists'));
       return;
     }
 
+    // Fetch RSS to get channel name
+    const rssData = await fetchChannelRSS(channelId);
+    const title = rssData ? rssData.channelTitle : channelId;
+
     const id = generateId();
     data.channels[id] = {
-      channelId: channelData.channelId,
-      title: channelData.title,
-      thumbnail: channelData.thumbnail,
-      uploadsPlaylistId: channelData.uploadsPlaylistId,
+      channelId: channelId,
+      title: title,
+      thumbnail: '',
       addedAt: Date.now(),
-      categoryId: categoryId || null,
-      cachedVideos: null
+      categoryId: categoryId || null
     };
 
     saveData();
@@ -1533,68 +1534,65 @@ async function addChannelFromUrl(url, categoryId) {
     showToast(t('channels.added'));
   } catch(e) {
     console.warn('addChannel error:', e);
+    if (loadingEl) loadingEl.style.display = 'none';
     showToast(t('channels.fetchError'));
   }
 }
 
-async function fetchChannelById(channelId, apiKey) {
-  const url = 'https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&id=' +
-    encodeURIComponent(channelId) + '&key=' + encodeURIComponent(apiKey);
-  const resp = await fetch(url);
-  if (!resp.ok) return null;
-  const json = await resp.json();
-  if (!json.items || json.items.length === 0) return null;
-  const item = json.items[0];
-  return {
-    channelId: item.id,
-    title: item.snippet.title,
-    thumbnail: item.snippet.thumbnails?.default?.url || '',
-    uploadsPlaylistId: item.contentDetails?.relatedPlaylists?.uploads || null
-  };
+async function resolveChannelId(info) {
+  const ytUrl = info.type === 'handle'
+    ? 'https://www.youtube.com/@' + info.value
+    : 'https://www.youtube.com/c/' + info.value;
+  const html = await corsGet(ytUrl);
+  if (!html) return null;
+  // externalId is the most reliable channel owner ID
+  let m = html.match(/"externalId":"(UC[a-zA-Z0-9_-]+)"/);
+  if (m) return m[1];
+  m = html.match(/"channelId":"(UC[a-zA-Z0-9_-]+)"/);
+  if (m) return m[1];
+  m = html.match(/channel\/(UC[a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  return null;
 }
 
-async function fetchChannelByHandle(handle, apiKey) {
-  const url = 'https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&forHandle=' +
-    encodeURIComponent(handle) + '&key=' + encodeURIComponent(apiKey);
-  const resp = await fetch(url);
-  if (!resp.ok) return null;
-  const json = await resp.json();
-  if (!json.items || json.items.length === 0) return null;
-  const item = json.items[0];
-  return {
-    channelId: item.id,
-    title: item.snippet.title,
-    thumbnail: item.snippet.thumbnails?.default?.url || '',
-    uploadsPlaylistId: item.contentDetails?.relatedPlaylists?.uploads || null
-  };
-}
+async function fetchChannelRSS(channelId) {
+  const rssUrl = 'https://www.youtube.com/feeds/videos.xml?channel_id=' + channelId;
+  const xml = await corsGet(rssUrl);
+  if (!xml) return null;
 
-async function fetchChannelByCustom(customUrl, apiKey) {
-  // Search by custom URL — fallback via search
-  const url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=' +
-    encodeURIComponent(customUrl) + '&maxResults=1&key=' + encodeURIComponent(apiKey);
-  const resp = await fetch(url);
-  if (!resp.ok) return null;
-  const json = await resp.json();
-  if (!json.items || json.items.length === 0) return null;
-  const channelId = json.items[0].snippet.channelId;
-  return fetchChannelById(channelId, apiKey);
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+  if (doc.querySelector('parsererror')) return null;
+
+  const ns = 'http://www.w3.org/2005/Atom';
+  const ytNs = 'http://www.youtube.com/xml/schemas/2015';
+  const mediaNs = 'http://search.yahoo.com/mrss/';
+
+  const channelTitle = doc.querySelector('feed > title')?.textContent || '';
+
+  const entries = doc.querySelectorAll('entry');
+  const videos = [];
+  entries.forEach(entry => {
+    const videoId = entry.getElementsByTagNameNS(ytNs, 'videoId')[0]?.textContent;
+    const title = entry.querySelector('title')?.textContent || '';
+    const mediaGroup = entry.getElementsByTagNameNS(mediaNs, 'group')[0];
+    const thumbnail = mediaGroup
+      ? (mediaGroup.getElementsByTagNameNS(mediaNs, 'thumbnail')[0]?.getAttribute('url') || getVideoThumbnail(videoId || ''))
+      : getVideoThumbnail(videoId || '');
+    const published = entry.querySelector('published')?.textContent || '';
+    if (videoId) {
+      videos.push({ videoId, title, thumbnail, publishedAt: published });
+    }
+  });
+
+  return { channelTitle, videos };
 }
 
 function renderChannels() {
   const list = document.getElementById('channel-list');
   const empty = document.getElementById('channels-empty');
-  const apiBanner = document.getElementById('api-needed-banner');
-  const apiKey = getApiKey();
 
   renderCategoryChips('channels');
-
-  // Show API banner if no key
-  if (!apiKey && Object.keys(data.channels).length === 0) {
-    apiBanner.style.display = 'block';
-  } else {
-    apiBanner.style.display = 'none';
-  }
 
   const channels = Object.entries(data.channels)
     .map(([id, c]) => ({ id, ...c }))
@@ -1607,7 +1605,7 @@ function renderChannels() {
     })
     .sort((a, b) => b.addedAt - a.addedAt);
 
-  if (channels.length === 0 && apiKey) {
+  if (channels.length === 0) {
     list.innerHTML = '';
     empty.style.display = 'block';
     return;
@@ -1649,29 +1647,24 @@ async function openChannelVideos(id) {
   grid.innerHTML = '';
   loading.style.display = 'block';
 
-  const apiKey = getApiKey();
-  if (!apiKey || !ch.uploadsPlaylistId) {
-    loading.innerHTML = '<div class="icon">⚠️</div><div class="title">' + escHtml(t('channels.noApiKey')) + '</div>';
-    return;
-  }
-
   try {
-    const videos = await fetchPlaylistVideos(ch.uploadsPlaylistId, apiKey);
+    const rssData = await fetchChannelRSS(ch.channelId);
     loading.style.display = 'none';
 
-    if (!videos || videos.length === 0) {
+    if (!rssData || rssData.videos.length === 0) {
       grid.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div class="title">No videos found</div></div>';
       return;
     }
 
-    // Filter shorts if setting enabled
-    let filtered = videos;
-    if (data.settings.shortsFilter) {
-      filtered = videos.filter(v => !v.isShort);
+    // Update channel title if it changed
+    if (rssData.channelTitle && rssData.channelTitle !== ch.title) {
+      data.channels[id].title = rssData.channelTitle;
+      saveData();
+      title.textContent = rssData.channelTitle;
     }
 
-    grid.innerHTML = filtered.map(v => {
-      const title = escHtml(v.title || v.videoId);
+    grid.innerHTML = rssData.videos.map(v => {
+      const vTitle = escHtml(v.title || v.videoId);
       const alreadySaved = Object.values(data.videos).some(mv => mv.videoId === v.videoId);
       return '<div class="video-card" onclick="playVideoById(\'' + escAttr(v.videoId) + '\',\'' +
         escAttr(v.title || '') + '\',\'' + escAttr(ch.title || '') + '\')">' +
@@ -1680,7 +1673,7 @@ async function openChannelVideos(id) {
         (alreadySaved ? '<div class="watched-badge">' + escHtml(t('videos.saved')) + '</div>' : '') +
         '</div>' +
         '<div class="card-info">' +
-        '<div class="card-title">' + title + '</div>' +
+        '<div class="card-title">' + vTitle + '</div>' +
         '<div class="card-actions">' +
         '<button onclick="event.stopPropagation();saveChannelVideoToMyVideos(\'' + escAttr(v.videoId) + '\',\'' +
         escAttr(v.title || '') + '\',\'' + escAttr(ch.title || '') + '\')">' +
@@ -1691,54 +1684,6 @@ async function openChannelVideos(id) {
     console.warn('openChannelVideos error:', e);
     loading.innerHTML = '<div class="icon">⚠️</div><div class="title">' + escHtml(t('channels.videosError')) + '</div>';
   }
-}
-
-async function fetchPlaylistVideos(playlistId, apiKey) {
-  const url = 'https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=' +
-    encodeURIComponent(playlistId) + '&maxResults=20&key=' + encodeURIComponent(apiKey);
-  const resp = await fetch(url);
-  if (!resp.ok) return null;
-  const json = await resp.json();
-  if (!json.items) return null;
-
-  const videos = json.items.map(item => ({
-    videoId: item.contentDetails?.videoId || item.snippet?.resourceId?.videoId,
-    title: item.snippet?.title || '',
-    thumbnail: item.snippet?.thumbnails?.medium?.url || getVideoThumbnail(item.contentDetails?.videoId || ''),
-    publishedAt: item.snippet?.publishedAt,
-    isShort: false
-  })).filter(v => v.videoId);
-
-  // Check durations to detect Shorts (requires additional API call)
-  if (data.settings.shortsFilter && videos.length > 0) {
-    const videoIds = videos.map(v => v.videoId).join(',');
-    try {
-      const dUrl = 'https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=' +
-        encodeURIComponent(videoIds) + '&key=' + encodeURIComponent(apiKey);
-      const dResp = await fetch(dUrl);
-      if (dResp.ok) {
-        const dJson = await dResp.json();
-        const durMap = {};
-        (dJson.items || []).forEach(item => {
-          durMap[item.id] = parseDuration(item.contentDetails?.duration || '');
-        });
-        videos.forEach(v => {
-          if (durMap[v.videoId] !== undefined && durMap[v.videoId] <= 60) {
-            v.isShort = true;
-          }
-        });
-      }
-    } catch(e) { /* ignore, don't filter */ }
-  }
-
-  return videos;
-}
-
-function parseDuration(iso) {
-  // Parse ISO 8601 duration PT1H2M3S
-  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-  if (!m) return 0;
-  return (parseInt(m[1] || 0) * 3600) + (parseInt(m[2] || 0) * 60) + parseInt(m[3] || 0);
 }
 
 function closeChannelVideos() {
@@ -1845,8 +1790,6 @@ function deleteCategory(id) {
 // ============== Settings Modal ==============
 function showSettingsModal() {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const apiKey = getApiKey();
-  const shortsFilter = data.settings.shortsFilter !== false;
 
   const html = '<h3>' + escHtml(t('settings.title')) + '</h3>' +
 
@@ -1864,21 +1807,6 @@ function showSettingsModal() {
     '<option value="ja"' + (currentLang === 'ja' ? ' selected' : '') + '>日本語</option>' +
     '<option value="en"' + (currentLang === 'en' ? ' selected' : '') + '>English</option>' +
     '</select></div></div>' +
-
-    // YouTube
-    '<div class="settings-group">' +
-    '<div class="group-title">' + escHtml(t('settings.youtube')) + '</div>' +
-    '<div class="form-group">' +
-    '<label>' + escHtml(t('settings.apiKey')) + '</label>' +
-    '<input type="text" id="settings-api-key" value="' + escAttr(apiKey) + '" placeholder="' + escAttr(t('settings.apiKeyPlaceholder')) + '">' +
-    '<div style="margin-top:6px;"><a href="#" onclick="event.preventDefault();showApiGuide()" style="font-size:12px;color:var(--red);">' +
-    escHtml(t('settings.apiKeyGuide')) + ' →</a></div>' +
-    '</div>' +
-    '<div class="settings-row">' +
-    '<div><div class="label">' + escHtml(t('settings.shortsFilter')) + '</div>' +
-    '<div class="sublabel">' + escHtml(t('settings.shortsFilterDesc')) + '</div></div>' +
-    '<div class="toggle' + (shortsFilter ? ' active' : '') + '" id="toggle-shorts" onclick="toggleSettingsShorts()"></div>' +
-    '</div></div>' +
 
     // Account
     '<div class="settings-group">' +
@@ -1914,10 +1842,6 @@ function toggleSettingsDark() {
   toggleDarkMode();
 }
 
-function toggleSettingsShorts() {
-  document.getElementById('toggle-shorts').classList.toggle('active');
-}
-
 function saveSettings() {
   // Language
   const lang = document.getElementById('settings-lang').value;
@@ -1927,35 +1851,12 @@ function saveSettings() {
     applyStaticTranslations();
   }
 
-  // API Key
-  const apiKey = document.getElementById('settings-api-key').value.trim();
-  setApiKey(apiKey);
-
-  // Shorts filter
-  data.settings.shortsFilter = document.getElementById('toggle-shorts').classList.contains('active');
-
   saveData();
   closeModal();
   showToast(t('toast.settingsSaved'));
 
   // Re-render all (including login banner for language change)
   renderAll();
-}
-
-function showApiGuide() {
-  const html = '<h3>' + escHtml(t('apiGuide.title')) + '</h3>' +
-    '<div class="api-guide"><ol>' +
-    '<li>' + escHtml(t('apiGuide.step1')) + '</li>' +
-    '<li>' + escHtml(t('apiGuide.step2')) + '</li>' +
-    '<li>' + escHtml(t('apiGuide.step3')) + '</li>' +
-    '<li>' + escHtml(t('apiGuide.step4')) + '</li>' +
-    '<li>' + escHtml(t('apiGuide.step5')) + '</li>' +
-    '</ol>' +
-    '<p style="margin-top:10px;font-weight:600;">' + escHtml(t('apiGuide.note')) + '</p></div>' +
-    '<div class="modal-actions" style="margin-top:16px;">' +
-    '<button class="btn btn-secondary btn-block" onclick="showSettingsModal()">' + escHtml(t('settings.close')) + '</button>' +
-    '</div>';
-  showModal(html);
 }
 
 // ============== Firebase Auth + Firestore ==============

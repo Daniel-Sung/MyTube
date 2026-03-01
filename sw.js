@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mytube-v1';
+const CACHE_NAME = 'mytube-v2';
 const ASSETS = [
   './index.html',
   './manifest.json',
@@ -27,6 +27,12 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+
+  // Skip cross-origin API requests (CORS proxy, YouTube API, etc.)
+  if (url.origin !== self.location.origin && !ASSETS.includes(event.request.url)) {
+    return;
+  }
+
   const isHTML = event.request.mode === 'navigate' || url.pathname.endsWith('.html');
 
   if (isHTML) {
