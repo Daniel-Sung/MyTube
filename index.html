@@ -1892,12 +1892,15 @@ function handleAuthClick() {
 function signInWithGoogle() {
   if (!auth) return;
   const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider).catch(err => {
-    console.warn('Google sign-in error:', err);
-    if (err.code === 'auth/popup-blocked') {
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    auth.signInWithRedirect(provider);
+  } else {
+    auth.signInWithPopup(provider).catch(err => {
+      console.warn('Google sign-in error:', err);
       auth.signInWithRedirect(provider);
-    }
-  });
+    });
+  }
 }
 
 function signOutUser() {
