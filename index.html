@@ -475,6 +475,60 @@ body {
   font-size: 20px;
 }
 
+/* ============== Player Overlay ============== */
+.player-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 200;
+  background: var(--bg);
+  overflow-y: auto;
+  animation: slideInRight 0.25s ease;
+}
+.player-overlay-header {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.player-overlay-header .back-btn {
+  background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text);
+}
+.player-overlay-header .p-overlay-title { font-size: 16px; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-overlay-body { padding: 16px; max-width: 800px; margin: 0 auto; }
+
+/* ============== Transcript Modal ============== */
+.transcript-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 250;
+  background: var(--bg);
+  overflow-y: auto;
+  animation: slideInRight 0.25s ease;
+}
+.transcript-header {
+  position: sticky; top: 0; z-index: 10;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.transcript-header .back-btn {
+  background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text);
+}
+.transcript-header .t-title { font-size: 16px; font-weight: 700; flex: 1; }
+.transcript-body { padding: 16px; max-width: 700px; margin: 0 auto; }
+.transcript-line {
+  display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border);
+  font-size: 14px; line-height: 1.5;
+}
+.transcript-line .ts { color: var(--red); font-weight: 600; white-space: nowrap; min-width: 50px; cursor: pointer; }
+.transcript-line .ts:hover { text-decoration: underline; }
+.transcript-line .txt { flex: 1; color: var(--text); }
+.transcript-lang-select {
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); color: var(--text); font-size: 13px;
+}
+
+/* ============== Video Meta Info ============== */
+.card-meta { font-size: 11px; color: var(--text-light); margin-top: 2px; display: flex; gap: 6px; }
+
 /* ============== Responsive ============== */
 @media (min-width: 640px) {
   .video-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
@@ -534,23 +588,33 @@ body {
   </div>
 </div>
 
-<!-- ============== Section: Player ============== -->
-<div id="sec-player" class="section">
-  <div class="player-container">
+<!-- ============== Player Overlay ============== -->
+<div id="player-overlay" class="player-overlay" style="display:none;">
+  <div class="player-overlay-header">
+    <button class="back-btn" onclick="closePlayerOverlay()">←</button>
+    <div class="p-overlay-title" id="player-overlay-title"></div>
+  </div>
+  <div class="player-overlay-body">
     <div class="player-wrap" id="player-wrap">
       <button class="player-fs-close" onclick="exitPlayerFullscreen()">✕</button>
-      <div class="player-placeholder" id="player-placeholder">
-        <div class="icon">▶️</div>
-        <div data-i18n="player.placeholder">영상을 선택하면 여기서 재생됩니다</div>
-      </div>
       <div id="yt-player-container"></div>
     </div>
-    <div class="player-info" id="player-info" style="display:none;">
+    <div class="player-info" id="player-info" style="margin-top:16px;">
       <div class="p-title" id="player-title"></div>
       <div class="p-channel" id="player-channel"></div>
       <div class="p-actions" id="player-actions"></div>
     </div>
   </div>
+</div>
+
+<!-- ============== Transcript Overlay ============== -->
+<div id="transcript-overlay" class="transcript-overlay" style="display:none;">
+  <div class="transcript-header">
+    <button class="back-btn" onclick="closeTranscript()">←</button>
+    <div class="t-title" id="transcript-title"></div>
+    <select class="transcript-lang-select" id="transcript-lang-select" style="display:none;" onchange="onTranscriptLangChange()"></select>
+  </div>
+  <div class="transcript-body" id="transcript-body"></div>
 </div>
 
 <!-- ============== Channel Videos Overlay ============== -->
@@ -579,9 +643,6 @@ body {
     </button>
     <button class="tab" data-tab="channels" onclick="switchTab('channels')">
       <span class="tab-icon">📡</span><span data-i18n="tab.channels">내 채널</span>
-    </button>
-    <button class="tab" data-tab="player" onclick="switchTab('player')">
-      <span class="tab-icon">▶️</span><span data-i18n="tab.player">플레이어</span>
     </button>
   </div>
 </div>
@@ -746,6 +807,22 @@ const TRANSLATIONS = {
     'cat.sports': '스포츠',
     'cat.news': '뉴스/시사',
     'cat.lifestyle': '생활/노하우',
+    'toast.urlCopied': '✓ URL이 복사되었습니다',
+    'transcript.title': '자막/스크립트',
+    'transcript.loading': '자막을 불러오는 중...',
+    'transcript.notFound': '자막을 찾을 수 없습니다',
+    'transcript.error': '자막을 불러올 수 없습니다',
+    'stats.title': '시청 통계',
+    'stats.totalTime': '총 시청 시간',
+    'stats.topChannels': '채널별 시청 시간 Top 10',
+    'stats.noData': '아직 시청 기록이 없습니다',
+    'stats.hours': '시간',
+    'stats.minutes': '분',
+    'stats.seconds': '초',
+    'channels.popularVideos': '인기 영상',
+    'channels.rssVideos': '최신 영상 (RSS)',
+    'video.views': '조회수',
+    'video.duration': '길이',
   },
   ja: {
     'app.title': 'MyTube',
@@ -861,6 +938,22 @@ const TRANSLATIONS = {
     'cat.sports': 'スポーツ',
     'cat.news': 'ニュース',
     'cat.lifestyle': '生活/ハウツー',
+    'toast.urlCopied': '✓ URLがコピーされました',
+    'transcript.title': '字幕/スクリプト',
+    'transcript.loading': '字幕を読み込み中...',
+    'transcript.notFound': '字幕が見つかりません',
+    'transcript.error': '字幕を読み込めません',
+    'stats.title': '視聴統計',
+    'stats.totalTime': '総視聴時間',
+    'stats.topChannels': 'チャンネル別視聴時間 Top 10',
+    'stats.noData': '視聴記録がまだありません',
+    'stats.hours': '時間',
+    'stats.minutes': '分',
+    'stats.seconds': '秒',
+    'channels.popularVideos': '人気動画',
+    'channels.rssVideos': '最新動画 (RSS)',
+    'video.views': '再生回数',
+    'video.duration': '長さ',
   },
   en: {
     'app.title': 'MyTube',
@@ -976,6 +1069,22 @@ const TRANSLATIONS = {
     'cat.sports': 'Sports',
     'cat.news': 'News',
     'cat.lifestyle': 'Lifestyle/Howto',
+    'toast.urlCopied': '✓ URL copied',
+    'transcript.title': 'Transcript',
+    'transcript.loading': 'Loading transcript...',
+    'transcript.notFound': 'No transcript found',
+    'transcript.error': 'Could not load transcript',
+    'stats.title': 'Watch Statistics',
+    'stats.totalTime': 'Total Watch Time',
+    'stats.topChannels': 'Top 10 Channels by Watch Time',
+    'stats.noData': 'No watch history yet',
+    'stats.hours': 'h',
+    'stats.minutes': 'm',
+    'stats.seconds': 's',
+    'channels.popularVideos': 'Popular Videos',
+    'channels.rssVideos': 'Latest Videos (RSS)',
+    'video.views': 'views',
+    'video.duration': 'duration',
   }
 };
 
@@ -1020,7 +1129,8 @@ let data = {
   videos: {},
   channels: {},
   categories: {},
-  settings: { darkMode: false, language: null, shortsFilter: true, defaultView: 'grid' }
+  settings: { darkMode: false, language: null, shortsFilter: true, defaultView: 'grid' },
+  watchLog: { totalSeconds: 0, channels: {}, videos: {} }
 };
 let activeTab = 'videos';
 let activeCategory = null;
@@ -1130,6 +1240,7 @@ function loadData() {
       if (!data.channels) data.channels = {};
       if (!data.categories) data.categories = {};
       if (!data.settings) data.settings = {};
+      if (!data.watchLog) data.watchLog = { totalSeconds: 0, channels: {}, videos: {} };
     }
   } catch(e) { console.warn('localStorage load error', e); }
   initDefaultCategories();
@@ -1195,7 +1306,7 @@ function showConfirm(msg, onConfirm) {
 }
 
 // ============== Tab Switching ==============
-const TAB_ORDER = ['videos', 'channels', 'player'];
+const TAB_ORDER = ['videos', 'channels'];
 
 function switchTab(tab) {
   activeTab = tab;
@@ -1205,9 +1316,9 @@ function switchTab(tab) {
   const btn = document.querySelector('.tab[data-tab="' + tab + '"]');
   if (btn) btn.classList.add('active');
 
-  // Show/hide FAB
+  // Show FAB
   const fab = document.getElementById('fab');
-  fab.style.display = (tab === 'player') ? 'none' : 'flex';
+  fab.style.display = 'flex';
 
   if (tab === 'videos') renderVideos();
   if (tab === 'channels') renderChannels();
@@ -1470,6 +1581,8 @@ function renderVideos() {
       '<div class="card-actions">' +
       '<button onclick="event.stopPropagation();toggleWatched(\'' + escAttr(v.id) + '\')">' +
       (v.watched ? '↩' : '✓') + '</button>' +
+      '<button onclick="event.stopPropagation();copyVideoUrl(\'' + escAttr(v.videoId) + '\')" title="URL">🔗</button>' +
+      '<button onclick="event.stopPropagation();openTranscript(\'' + escAttr(v.videoId) + '\',\'' + escAttr(v.title || '') + '\')" title="Transcript">📝</button>' +
       '<button onclick="event.stopPropagation();deleteVideo(\'' + escAttr(v.id) + '\')">🗑</button>' +
       '</div></div></div>';
   }).join('');
@@ -1504,50 +1617,49 @@ window.onYouTubeIframeAPIReady = function() {
   ytReady = true;
 };
 
+let currentPlayingVideoId = null; // raw YouTube videoId for watch log
+let currentPlayingChannel = null;
+
 function playVideo(id) {
   const v = data.videos[id];
   if (!v) return;
   currentVideoId = id;
-  switchTab('player');
+  currentPlayingVideoId = v.videoId;
+  currentPlayingChannel = v.channelTitle || '';
 
-  const placeholder = document.getElementById('player-placeholder');
-  const container = document.getElementById('yt-player-container');
-  const info = document.getElementById('player-info');
-
-  placeholder.style.display = 'none';
-  info.style.display = 'block';
-
-  document.getElementById('player-title').textContent = v.title || v.videoId;
-  document.getElementById('player-channel').textContent = v.channelTitle || '';
+  openPlayerOverlay(v.videoId, v.title || v.videoId, v.channelTitle || '');
 
   const actionsHtml =
     '<button class="btn btn-sm ' + (v.watched ? 'btn-secondary' : 'btn-primary') + '" onclick="toggleCurrentWatched()">' +
-    escHtml(v.watched ? t('videos.markUnwatched') : t('videos.markWatched')) + '</button>';
+    escHtml(v.watched ? t('videos.markUnwatched') : t('videos.markWatched')) + '</button>' +
+    '<button class="btn btn-sm btn-secondary" onclick="copyVideoUrl(\'' + escAttr(v.videoId) + '\')">🔗 URL</button>' +
+    '<button class="btn btn-sm btn-secondary" onclick="openTranscript(\'' + escAttr(v.videoId) + '\',\'' + escAttr(v.title || '') + '\')">📝</button>';
   document.getElementById('player-actions').innerHTML = actionsHtml;
-
-  if (ytReady) {
-    createPlayer(v.videoId);
-  } else {
-    container.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + v.videoId +
-      '?rel=0&playsinline=1&modestbranding=1&autoplay=1" allowfullscreen allow="autoplay"></iframe>';
-    enterPlayerFullscreen();
-  }
 }
 
 function playVideoById(videoId, title, channel) {
   currentVideoId = null;
-  switchTab('player');
+  currentPlayingVideoId = videoId;
+  currentPlayingChannel = channel || '';
 
-  const placeholder = document.getElementById('player-placeholder');
-  const info = document.getElementById('player-info');
-  placeholder.style.display = 'none';
-  info.style.display = 'block';
+  openPlayerOverlay(videoId, title || videoId, channel || '');
 
-  document.getElementById('player-title').textContent = title || videoId;
-  document.getElementById('player-channel').textContent = channel || '';
   document.getElementById('player-actions').innerHTML =
     '<button class="btn btn-sm btn-primary" onclick="saveChannelVideoToMyVideos(\'' + escAttr(videoId) + '\',\'' +
-    escAttr(title || '') + '\',\'' + escAttr(channel || '') + '\')">' + escHtml(t('videos.saveToMy')) + '</button>';
+    escAttr(title || '') + '\',\'' + escAttr(channel || '') + '\')">' + escHtml(t('videos.saveToMy')) + '</button>' +
+    '<button class="btn btn-sm btn-secondary" onclick="copyVideoUrl(\'' + escAttr(videoId) + '\')">🔗 URL</button>' +
+    '<button class="btn btn-sm btn-secondary" onclick="openTranscript(\'' + escAttr(videoId) + '\',\'' + escAttr(title || '') + '\')">📝</button>';
+}
+
+function openPlayerOverlay(videoId, title, channel) {
+  const overlay = document.getElementById('player-overlay');
+  overlay.style.display = 'block';
+  document.getElementById('player-overlay-title').textContent = title || videoId;
+
+  const info = document.getElementById('player-info');
+  info.style.display = 'block';
+  document.getElementById('player-title').textContent = title || videoId;
+  document.getElementById('player-channel').textContent = channel || '';
 
   if (ytReady) {
     createPlayer(videoId);
@@ -1558,6 +1670,22 @@ function playVideoById(videoId, title, channel) {
     enterPlayerFullscreen();
   }
 }
+
+function closePlayerOverlay() {
+  // Stop watch time tracking
+  stopWatchTimer();
+  // Stop player
+  if (ytPlayer && ytPlayer.stopVideo) {
+    try { ytPlayer.stopVideo(); } catch(e) {}
+  }
+  document.getElementById('yt-player-container').innerHTML = '';
+  ytPlayer = null;
+  document.getElementById('player-overlay').style.display = 'none';
+  currentPlayingVideoId = null;
+  currentPlayingChannel = null;
+}
+
+let watchStartTime = null;
 
 function createPlayer(videoId) {
   const container = document.getElementById('yt-player-container');
@@ -1576,12 +1704,40 @@ function createPlayer(videoId) {
         enterPlayerFullscreen();
       },
       onStateChange: function(event) {
+        if (event.data === YT.PlayerState.PLAYING) {
+          watchStartTime = Date.now();
+        } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
+          accumulateWatchTime();
+        }
         if (event.data === YT.PlayerState.ENDED) {
           onVideoEnded();
         }
       }
     }
   });
+}
+
+function accumulateWatchTime() {
+  if (!watchStartTime) return;
+  const elapsed = Math.floor((Date.now() - watchStartTime) / 1000);
+  watchStartTime = null;
+  if (elapsed <= 0 || elapsed > 86400) return; // sanity check
+
+  if (!data.watchLog) data.watchLog = { totalSeconds: 0, channels: {}, videos: {} };
+  data.watchLog.totalSeconds += elapsed;
+
+  if (currentPlayingVideoId) {
+    data.watchLog.videos[currentPlayingVideoId] = (data.watchLog.videos[currentPlayingVideoId] || 0) + elapsed;
+  }
+  if (currentPlayingChannel) {
+    data.watchLog.channels[currentPlayingChannel] = (data.watchLog.channels[currentPlayingChannel] || 0) + elapsed;
+  }
+  saveData();
+}
+
+function stopWatchTimer() {
+  accumulateWatchTime();
+  watchStartTime = null;
 }
 
 // ============== Fullscreen + Landscape ==============
@@ -1619,10 +1775,12 @@ function onVideoEnded() {
     data.videos[currentVideoId].watched = true;
     saveData();
     showToast(t('player.ended'));
-    // Update player UI
+    const v = data.videos[currentVideoId];
     const actionsHtml =
       '<button class="btn btn-sm btn-secondary" onclick="toggleCurrentWatched()">' +
-      escHtml(t('videos.markUnwatched')) + '</button>';
+      escHtml(t('videos.markUnwatched')) + '</button>' +
+      '<button class="btn btn-sm btn-secondary" onclick="copyVideoUrl(\'' + escAttr(v.videoId) + '\')">🔗 URL</button>' +
+      '<button class="btn btn-sm btn-secondary" onclick="openTranscript(\'' + escAttr(v.videoId) + '\',\'' + escAttr(v.title || '') + '\')">📝</button>';
     document.getElementById('player-actions').innerHTML = actionsHtml;
   }
 }
@@ -1634,7 +1792,9 @@ function toggleCurrentWatched() {
     const v = data.videos[currentVideoId];
     const actionsHtml =
       '<button class="btn btn-sm ' + (v.watched ? 'btn-secondary' : 'btn-primary') + '" onclick="toggleCurrentWatched()">' +
-      escHtml(v.watched ? t('videos.markUnwatched') : t('videos.markWatched')) + '</button>';
+      escHtml(v.watched ? t('videos.markUnwatched') : t('videos.markWatched')) + '</button>' +
+      '<button class="btn btn-sm btn-secondary" onclick="copyVideoUrl(\'' + escAttr(v.videoId) + '\')">🔗 URL</button>' +
+      '<button class="btn btn-sm btn-secondary" onclick="openTranscript(\'' + escAttr(v.videoId) + '\',\'' + escAttr(v.title || '') + '\')">📝</button>';
     document.getElementById('player-actions').innerHTML = actionsHtml;
   }
 }
@@ -1657,9 +1817,154 @@ function saveChannelVideoToMyVideos(videoId, title, channel) {
   };
   saveData();
   showToast(t('videos.saved'));
-  // Update button
-  document.getElementById('player-actions').innerHTML =
-    '<button class="btn btn-sm btn-secondary" disabled>' + escHtml(t('videos.saved')) + '</button>';
+  // Update button in player overlay
+  const actionsEl = document.getElementById('player-actions');
+  if (actionsEl) {
+    actionsEl.innerHTML =
+      '<button class="btn btn-sm btn-secondary" disabled>' + escHtml(t('videos.saved')) + '</button>' +
+      '<button class="btn btn-sm btn-secondary" onclick="copyVideoUrl(\'' + escAttr(videoId) + '\')">🔗 URL</button>' +
+      '<button class="btn btn-sm btn-secondary" onclick="openTranscript(\'' + escAttr(videoId) + '\',\'' + escAttr(title || '') + '\')">📝</button>';
+  }
+}
+
+// ============== Copy Video URL ==============
+function copyVideoUrl(videoId) {
+  const url = 'https://www.youtube.com/watch?v=' + videoId;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      showToast(t('toast.urlCopied'));
+    }).catch(() => { fallbackCopy(url); });
+  } else {
+    fallbackCopy(url);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;left:-9999px;';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); showToast(t('toast.urlCopied')); }
+  catch(e) { showToast('Copy failed'); }
+  document.body.removeChild(ta);
+}
+
+// ============== Transcript ==============
+let transcriptTracks = [];
+let currentTranscriptVideoId = null;
+
+async function openTranscript(videoId, title) {
+  currentTranscriptVideoId = videoId;
+  const overlay = document.getElementById('transcript-overlay');
+  const body = document.getElementById('transcript-body');
+  const titleEl = document.getElementById('transcript-title');
+  const langSel = document.getElementById('transcript-lang-select');
+
+  overlay.style.display = 'block';
+  titleEl.textContent = t('transcript.title') + ' - ' + (title || videoId);
+  langSel.style.display = 'none';
+  body.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><div class="title">' + escHtml(t('transcript.loading')) + '</div></div>';
+
+  try {
+    const pageUrl = 'https://www.youtube.com/watch?v=' + videoId;
+    const html = await corsGet(pageUrl);
+    if (!html) { body.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div class="title">' + escHtml(t('transcript.error')) + '</div></div>'; return; }
+
+    // Extract captions from ytInitialPlayerResponse
+    const m = html.match(/"captions"\s*:\s*(\{"captionTracks".+?\])\s*,\s*"/s) ||
+              html.match(/"captionTracks"\s*:\s*(\[.+?\])/s);
+    let tracks = [];
+    if (m) {
+      try {
+        let jsonStr = m[0].includes('"captions"') ? m[1] + '}' : m[1];
+        // Try parsing the captionTracks array
+        const parsed = JSON.parse(jsonStr.startsWith('[') ? jsonStr : '{"captionTracks":' + jsonStr);
+        tracks = parsed.captionTracks || parsed || [];
+      } catch(e) {
+        // Try a different extraction
+        const trackMatch = html.match(/"captionTracks"\s*:\s*(\[[\s\S]*?\])\s*[,}]/);
+        if (trackMatch) {
+          try { tracks = JSON.parse(trackMatch[1]); } catch(e2) {}
+        }
+      }
+    }
+
+    if (!tracks || tracks.length === 0) {
+      body.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div class="title">' + escHtml(t('transcript.notFound')) + '</div></div>';
+      return;
+    }
+
+    transcriptTracks = tracks;
+
+    if (tracks.length > 1) {
+      langSel.style.display = 'block';
+      langSel.innerHTML = tracks.map((tr, i) =>
+        '<option value="' + i + '">' + escHtml(tr.name?.simpleText || tr.languageCode || ('Track ' + (i+1))) + '</option>'
+      ).join('');
+    }
+
+    await loadTranscriptTrack(0);
+  } catch(e) {
+    console.warn('Transcript error:', e);
+    body.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div class="title">' + escHtml(t('transcript.error')) + '</div></div>';
+  }
+}
+
+async function loadTranscriptTrack(index) {
+  const body = document.getElementById('transcript-body');
+  const track = transcriptTracks[index];
+  if (!track || !track.baseUrl) {
+    body.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div class="title">' + escHtml(t('transcript.notFound')) + '</div></div>';
+    return;
+  }
+
+  body.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><div class="title">' + escHtml(t('transcript.loading')) + '</div></div>';
+
+  const xml = await corsGet(track.baseUrl);
+  if (!xml) {
+    body.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div class="title">' + escHtml(t('transcript.error')) + '</div></div>';
+    return;
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, 'text/xml');
+  const texts = doc.querySelectorAll('text');
+
+  if (texts.length === 0) {
+    body.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div class="title">' + escHtml(t('transcript.notFound')) + '</div></div>';
+    return;
+  }
+
+  let html = '';
+  texts.forEach(node => {
+    const start = parseFloat(node.getAttribute('start') || '0');
+    const mins = Math.floor(start / 60);
+    const secs = Math.floor(start % 60);
+    const timestamp = mins + ':' + String(secs).padStart(2, '0');
+    const text = node.textContent.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+    html += '<div class="transcript-line">' +
+      '<span class="ts" onclick="seekPlayerTo(' + start + ')">' + timestamp + '</span>' +
+      '<span class="txt">' + escHtml(text) + '</span></div>';
+  });
+  body.innerHTML = html;
+}
+
+function onTranscriptLangChange() {
+  const sel = document.getElementById('transcript-lang-select');
+  loadTranscriptTrack(parseInt(sel.value) || 0);
+}
+
+function seekPlayerTo(seconds) {
+  if (ytPlayer && ytPlayer.seekTo) {
+    ytPlayer.seekTo(seconds, true);
+    if (ytPlayer.playVideo) ytPlayer.playVideo();
+  }
+}
+
+function closeTranscript() {
+  document.getElementById('transcript-overlay').style.display = 'none';
+  transcriptTracks = [];
 }
 
 // ============== CORS Proxy ==============
@@ -1967,6 +2272,79 @@ async function fetchChannelRSS(channelId) {
   return { channelTitle, videos };
 }
 
+// ============== Channel Scraping (Popular Videos) ==============
+async function fetchChannelPopularVideos(channelId) {
+  const url = 'https://www.youtube.com/channel/' + channelId + '/videos?view=0&sort=p';
+  const html = await corsGet(url);
+  if (!html) return null;
+
+  const m = html.match(/var\s+ytInitialData\s*=\s*(\{.+?\});\s*<\/script>/s);
+  if (!m) return null;
+
+  try {
+    const yt = JSON.parse(m[1]);
+    // Navigate to video items
+    const tabs = yt?.contents?.twoColumnBrowseResultsRenderer?.tabs || [];
+    let items = [];
+    for (const tab of tabs) {
+      const tabContent = tab?.tabRenderer?.content;
+      if (!tabContent) continue;
+      const richGrid = tabContent?.richGridRenderer?.contents || [];
+      for (const gridItem of richGrid) {
+        const video = gridItem?.richItemRenderer?.content?.videoRenderer;
+        if (!video) continue;
+        const videoId = video.videoId;
+        if (!videoId) continue;
+
+        const title = video.title?.runs?.map(r => r.text).join('') || '';
+        const thumbnail = video.thumbnail?.thumbnails?.slice(-1)[0]?.url || getVideoThumbnail(videoId);
+
+        // View count
+        const viewText = video.viewCountText?.simpleText || video.viewCountText?.runs?.map(r => r.text).join('') || '';
+
+        // Duration
+        const durationText = video.lengthText?.simpleText || '';
+        const durationSeconds = parseDuration(durationText);
+
+        // Check if Shorts
+        const isShorts = (
+          durationSeconds > 0 && durationSeconds < 61
+        ) || (
+          video.thumbnailOverlays?.some(o =>
+            o?.thumbnailOverlayTimeStatusRenderer?.style === 'SHORTS'
+          )
+        ) || (
+          video.navigationEndpoint?.commandMetadata?.webCommandMetadata?.url?.includes('/shorts/')
+        );
+
+        if (!isShorts) {
+          items.push({ videoId, title, thumbnail, viewText, durationText, durationSeconds });
+        }
+      }
+      if (items.length > 0) break;
+    }
+
+    // Extract channel title
+    const channelTitle = yt?.metadata?.channelMetadataRenderer?.title || '';
+    return { channelTitle, videos: items };
+  } catch(e) {
+    console.warn('Channel scraping parse error:', e);
+    return null;
+  }
+}
+
+function parseDuration(text) {
+  if (!text) return 0;
+  const parts = text.split(':').map(Number);
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return parts[0] || 0;
+}
+
+function formatViewCount(text) {
+  return text || '';
+}
+
 function renderChannels() {
   const list = document.getElementById('channel-list');
   const empty = document.getElementById('channels-empty');
@@ -2027,38 +2405,65 @@ async function openChannelVideos(id) {
   loading.style.display = 'block';
 
   try {
-    const rssData = await fetchChannelRSS(ch.channelId);
+    // Try scraping popular videos first
+    let videoData = await fetchChannelPopularVideos(ch.channelId);
+    let isPopular = true;
+
+    // Fallback to RSS if scraping fails
+    if (!videoData || videoData.videos.length === 0) {
+      const rssData = await fetchChannelRSS(ch.channelId);
+      if (rssData && rssData.videos.length > 0) {
+        videoData = { channelTitle: rssData.channelTitle, videos: rssData.videos.map(v => ({ ...v, viewText: '', durationText: '' })) };
+        isPopular = false;
+      }
+    }
+
     loading.style.display = 'none';
 
-    if (!rssData || rssData.videos.length === 0) {
+    if (!videoData || videoData.videos.length === 0) {
       grid.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div class="title">No videos found</div></div>';
       return;
     }
 
     // Update channel title if it changed
-    if (rssData.channelTitle && rssData.channelTitle !== ch.title) {
-      data.channels[id].title = rssData.channelTitle;
+    if (videoData.channelTitle && videoData.channelTitle !== ch.title) {
+      data.channels[id].title = videoData.channelTitle;
       saveData();
-      title.textContent = rssData.channelTitle;
+      title.textContent = videoData.channelTitle;
     }
 
-    grid.innerHTML = rssData.videos.map(v => {
+    // Label: popular or RSS
+    const labelText = isPopular ? t('channels.popularVideos') : t('channels.rssVideos');
+    let gridHtml = '<div style="font-size:12px;color:var(--text-light);margin-bottom:8px;grid-column:1/-1;">' + escHtml(labelText) + '</div>';
+
+    gridHtml += videoData.videos.map(v => {
       const vTitle = escHtml(v.title || v.videoId);
       const alreadySaved = Object.values(data.videos).some(mv => mv.videoId === v.videoId);
+      const metaHtml = (v.viewText || v.durationText) ?
+        '<div class="card-meta">' +
+        (v.viewText ? '<span>' + escHtml(v.viewText) + '</span>' : '') +
+        (v.durationText ? '<span>' + escHtml(v.durationText) + '</span>' : '') +
+        '</div>' : '';
       return '<div class="video-card" onclick="playVideoById(\'' + escAttr(v.videoId) + '\',\'' +
         escAttr(v.title || '') + '\',\'' + escAttr(ch.title || '') + '\')">' +
         '<div class="thumb-wrap">' +
         '<img src="' + escHtml(v.thumbnail) + '" alt="" loading="lazy">' +
+        (v.durationText ? '<div style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.8);color:#fff;font-size:10px;padding:1px 4px;border-radius:3px;">' + escHtml(v.durationText) + '</div>' : '') +
         (alreadySaved ? '<div class="watched-badge">' + escHtml(t('videos.saved')) + '</div>' : '') +
         '</div>' +
         '<div class="card-info">' +
         '<div class="card-title">' + vTitle + '</div>' +
+        metaHtml +
         '<div class="card-actions">' +
         '<button onclick="event.stopPropagation();saveChannelVideoToMyVideos(\'' + escAttr(v.videoId) + '\',\'' +
         escAttr(v.title || '') + '\',\'' + escAttr(ch.title || '') + '\')">' +
         (alreadySaved ? '✓' : '💾') + '</button>' +
+        '<button onclick="event.stopPropagation();copyVideoUrl(\'' + escAttr(v.videoId) + '\')" title="URL">🔗</button>' +
+        '<button onclick="event.stopPropagation();openTranscript(\'' + escAttr(v.videoId) + '\',\'' + escAttr(v.title || '') + '\')" title="Transcript">📝</button>' +
         '</div></div></div>';
     }).join('');
+
+    grid.innerHTML = gridHtml;
   } catch(e) {
     console.warn('openChannelVideos error:', e);
     loading.innerHTML = '<div class="icon">⚠️</div><div class="title">' + escHtml(t('channels.videosError')) + '</div>';
@@ -2200,10 +2605,16 @@ function showSettingsModal() {
     ) +
     '</div>' +
 
+    // Watch Statistics
+    '<div class="settings-group">' +
+    '<div class="group-title">' + escHtml(t('stats.title')) + '</div>' +
+    buildWatchStatsHtml() +
+    '</div>' +
+
     // App Info
     '<div class="settings-group">' +
     '<div class="group-title">' + escHtml(t('settings.appInfo')) + '</div>' +
-    '<div class="settings-row"><div class="label">' + escHtml(t('settings.version')) + '</div><div style="color:var(--text-sub);">v1.0</div></div>' +
+    '<div class="settings-row"><div class="label">' + escHtml(t('settings.version')) + '</div><div style="color:var(--text-sub);">v1.1</div></div>' +
     '<div class="settings-row"><div class="label">' + escHtml(t('settings.developer')) + '</div><div style="color:var(--text-sub);">Bekking Studio</div></div>' +
     '<div class="settings-row"><div class="label">' + escHtml(t('settings.feedback')) + '</div><div style="color:var(--text-sub);font-size:12px;">info.bekking@gmail.com</div></div>' +
     '</div>' +
@@ -2213,6 +2624,41 @@ function showSettingsModal() {
     '</div>';
 
   showModal(html);
+}
+
+function formatWatchTime(totalSecs) {
+  const h = Math.floor(totalSecs / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  let parts = [];
+  if (h > 0) parts.push(h + t('stats.hours'));
+  if (m > 0) parts.push(m + t('stats.minutes'));
+  if (h === 0) parts.push(s + t('stats.seconds'));
+  return parts.join(' ');
+}
+
+function buildWatchStatsHtml() {
+  const wl = data.watchLog || { totalSeconds: 0, channels: {}, videos: {} };
+  if (wl.totalSeconds === 0) {
+    return '<div style="padding:12px 0;color:var(--text-light);font-size:13px;">' + escHtml(t('stats.noData')) + '</div>';
+  }
+
+  let html = '<div class="settings-row"><div class="label">' + escHtml(t('stats.totalTime')) + '</div>' +
+    '<div style="color:var(--red);font-weight:700;">' + formatWatchTime(wl.totalSeconds) + '</div></div>';
+
+  // Top 10 channels
+  const channelEntries = Object.entries(wl.channels || {}).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  if (channelEntries.length > 0) {
+    html += '<div style="padding:8px 0 4px;font-size:12px;font-weight:700;color:var(--text-light);">' + escHtml(t('stats.topChannels')) + '</div>';
+    channelEntries.forEach(([name, secs], i) => {
+      const pct = Math.round((secs / wl.totalSeconds) * 100);
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">' +
+        '<span style="font-size:12px;color:var(--text-light);width:20px;">' + (i + 1) + '</span>' +
+        '<span style="flex:1;font-size:13px;font-weight:500;">' + escHtml(name) + '</span>' +
+        '<span style="font-size:12px;color:var(--text-sub);">' + formatWatchTime(secs) + ' (' + pct + '%)</span></div>';
+    });
+  }
+  return html;
 }
 
 function toggleSettingsDark() {
@@ -2350,6 +2796,7 @@ async function syncToCloud() {
       channels: data.channels || {},
       categories: data.categories || {},
       settings: data.settings || {},
+      watchLog: data.watchLog || { totalSeconds: 0, channels: {}, videos: {} },
       lastSync: now
     }, { merge: true });
 
@@ -2376,6 +2823,7 @@ async function syncFromCloud() {
       if (d.channels) data.channels = d.channels;
       if (d.categories) data.categories = d.categories;
       if (d.settings) data.settings = { ...data.settings, ...d.settings };
+      if (d.watchLog) data.watchLog = d.watchLog;
     }
     localStorage.setItem('myTube', JSON.stringify(data));
     lastSyncTime = Date.now();
