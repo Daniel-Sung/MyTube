@@ -397,6 +397,84 @@ body {
 .api-guide code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
 .api-guide a { color: var(--red); text-decoration: none; }
 
+/* ============== Channel Search (in modal) ============== */
+.modal-tabs {
+  display: flex; gap: 0; margin-bottom: 16px;
+  border-bottom: 2px solid var(--border);
+}
+.modal-tab {
+  flex: 1; padding: 10px; text-align: center;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  background: none; border: none; color: var(--text-sub);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all var(--transition);
+}
+.modal-tab.active {
+  color: var(--red); border-bottom-color: var(--red);
+}
+.modal-tab-content { display: none; }
+.modal-tab-content.active { display: block; }
+.ch-search-bar {
+  display: flex; gap: 8px; margin-bottom: 12px;
+}
+.ch-search-bar input {
+  flex: 1; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 14px;
+  background: var(--bg); color: var(--text); outline: none;
+}
+.ch-search-bar input:focus { border-color: var(--red); }
+.ch-search-bar button {
+  padding: 10px 16px; background: var(--red); color: #fff;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+}
+.ch-search-bar button:hover { background: var(--red-dark); }
+.ch-search-results {
+  max-height: 320px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.ch-search-result {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px; border-radius: var(--radius-sm);
+  background: var(--bg); cursor: pointer;
+  transition: background 0.15s;
+}
+.ch-search-result:hover { background: var(--border); }
+.ch-search-result img {
+  width: 48px; height: 48px; border-radius: 50%; object-fit: cover;
+  background: var(--border); flex-shrink: 0;
+}
+.ch-search-result .ch-result-info { flex: 1; min-width: 0; }
+.ch-search-result .ch-result-name {
+  font-size: 14px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ch-search-result .ch-result-meta {
+  font-size: 12px; color: var(--text-sub); margin-top: 2px;
+}
+.ch-search-result .ch-result-add {
+  flex-shrink: 0; padding: 6px 12px;
+  background: var(--red); color: #fff;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.ch-search-result .ch-result-add:hover { background: var(--red-dark); }
+.ch-search-result .ch-result-added {
+  flex-shrink: 0; padding: 6px 12px;
+  background: var(--success); color: #fff;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 600;
+}
+.ch-search-loading, .ch-search-empty {
+  text-align: center; padding: 24px; color: var(--text-sub); font-size: 13px;
+}
+.ch-search-loading .spinner {
+  display: inline-block; animation: spin 1s linear infinite; margin-bottom: 8px;
+  font-size: 20px;
+}
+
 /* ============== Responsive ============== */
 @media (min-width: 640px) {
   .video-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
@@ -651,6 +729,15 @@ const TRANSLATIONS = {
     'toast.apiKeyInvalid': '✗ API 키가 유효하지 않습니다',
     'toast.settingsSaved': '✓ 설정이 저장되었습니다',
     'toast.categoryAdded': '✓ 카테고리가 추가되었습니다',
+    'channels.searchTab': '검색',
+    'channels.urlTab': 'URL 입력',
+    'channels.searchPlaceholder': '채널 이름으로 검색',
+    'channels.searchBtn': '검색',
+    'channels.searching': '채널을 검색하는 중...',
+    'channels.noResults': '검색 결과가 없습니다',
+    'channels.searchError': '검색에 실패했습니다. 다시 시도해주세요',
+    'channels.addBtn': '추가',
+    'channels.addedBtn': '추가됨',
   },
   ja: {
     'app.title': 'MyTube',
@@ -749,6 +836,15 @@ const TRANSLATIONS = {
     'toast.apiKeyInvalid': '✗ APIキーが無効です',
     'toast.settingsSaved': '✓ 設定が保存されました',
     'toast.categoryAdded': '✓ カテゴリが追加されました',
+    'channels.searchTab': '検索',
+    'channels.urlTab': 'URL入力',
+    'channels.searchPlaceholder': 'チャンネル名で検索',
+    'channels.searchBtn': '検索',
+    'channels.searching': 'チャンネルを検索中...',
+    'channels.noResults': '検索結果がありません',
+    'channels.searchError': '検索に失敗しました。もう一度お試しください',
+    'channels.addBtn': '追加',
+    'channels.addedBtn': '追加済み',
   },
   en: {
     'app.title': 'MyTube',
@@ -847,6 +943,15 @@ const TRANSLATIONS = {
     'toast.apiKeyInvalid': '✗ API key is invalid',
     'toast.settingsSaved': '✓ Settings saved',
     'toast.categoryAdded': '✓ Category added',
+    'channels.searchTab': 'Search',
+    'channels.urlTab': 'Paste URL',
+    'channels.searchPlaceholder': 'Search by channel name',
+    'channels.searchBtn': 'Search',
+    'channels.searching': 'Searching channels...',
+    'channels.noResults': 'No results found',
+    'channels.searchError': 'Search failed. Please try again',
+    'channels.addBtn': 'Add',
+    'channels.addedBtn': 'Added',
   }
 };
 
@@ -1456,9 +1561,27 @@ async function corsGet(url) {
 // ============== Channels Tab (RSS-based, no API key needed) ==============
 function showAddChannelModal() {
   const html = '<h3>' + escHtml(t('channels.addTitle')) + '</h3>' +
+    '<div class="modal-tabs">' +
+    '<button class="modal-tab active" id="tab-search" onclick="switchChannelModalTab(\'search\')">' + escHtml(t('channels.searchTab')) + '</button>' +
+    '<button class="modal-tab" id="tab-url" onclick="switchChannelModalTab(\'url\')">' + escHtml(t('channels.urlTab')) + '</button>' +
+    '</div>' +
+    // Search tab
+    '<div class="modal-tab-content active" id="tab-content-search">' +
+    '<div class="ch-search-bar">' +
+    '<input type="text" id="ch-search-input" placeholder="' + escAttr(t('channels.searchPlaceholder')) + '" autofocus>' +
+    '<button onclick="doChannelSearch()">' + escHtml(t('channels.searchBtn')) + '</button>' +
+    '</div>' +
+    '<div class="form-group">' +
+    '<label>' + escHtml(t('categories.title')) + '</label>' +
+    '<select id="add-channel-category-search">' + getCategoryOptions() + '</select>' +
+    '</div>' +
+    '<div id="ch-search-results" class="ch-search-results"></div>' +
+    '</div>' +
+    // URL tab
+    '<div class="modal-tab-content" id="tab-content-url">' +
     '<div class="form-group">' +
     '<label>YouTube Channel URL</label>' +
-    '<input type="text" id="add-channel-url" placeholder="' + escAttr(t('channels.urlPlaceholder')) + '" autofocus>' +
+    '<input type="text" id="add-channel-url" placeholder="' + escAttr(t('channels.urlPlaceholder')) + '">' +
     '<div id="add-channel-error" style="color:var(--danger);font-size:12px;margin-top:4px;display:none;"></div>' +
     '<div id="add-channel-loading" style="color:var(--text-sub);font-size:12px;margin-top:4px;display:none;">' + escHtml(t('channels.loading')) + '</div>' +
     '</div>' +
@@ -1469,14 +1592,134 @@ function showAddChannelModal() {
     '<div class="modal-actions">' +
     '<button class="btn btn-secondary" onclick="closeModal()">' + escHtml(t('videos.cancel')) + '</button>' +
     '<button class="btn btn-primary" id="add-channel-btn">' + escHtml(t('videos.add')) + '</button>' +
+    '</div>' +
     '</div>';
   showModal(html);
+
+  // Enter key triggers search
+  document.getElementById('ch-search-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doChannelSearch();
+  });
 
   document.getElementById('add-channel-btn').onclick = function() {
     const url = document.getElementById('add-channel-url').value;
     const cat = document.getElementById('add-channel-category').value;
     addChannelFromUrl(url, cat);
   };
+}
+
+function switchChannelModalTab(tab) {
+  document.querySelectorAll('.modal-tab').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.modal-tab-content').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('tab-content-' + tab).classList.add('active');
+  if (tab === 'search') {
+    document.getElementById('ch-search-input')?.focus();
+  } else {
+    document.getElementById('add-channel-url')?.focus();
+  }
+}
+
+async function searchYouTubeChannels(query) {
+  // sp=EgIQAg%3D%3D = channel filter
+  const searchUrl = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query) + '&sp=EgIQAg%3D%3D';
+  const html = await corsGet(searchUrl);
+  if (!html) return null;
+
+  // Extract ytInitialData JSON
+  const m = html.match(/var\s+ytInitialData\s*=\s*(\{.+?\});\s*<\/script>/s);
+  if (!m) return null;
+
+  try {
+    const yt = JSON.parse(m[1]);
+    const sections = yt?.contents?.twoColumnSearchResultsRenderer?.primaryContents
+      ?.sectionListRenderer?.contents || [];
+    const results = [];
+
+    for (const section of sections) {
+      const items = section?.itemSectionRenderer?.contents || [];
+      for (const item of items) {
+        const ch = item?.channelRenderer;
+        if (!ch) continue;
+        const channelId = ch.channelId;
+        const title = ch.title?.simpleText || '';
+        const thumbs = ch.thumbnail?.thumbnails || [];
+        const thumbnail = thumbs.length > 0 ? thumbs[thumbs.length - 1].url : '';
+        const subText = ch.subscriberCountText?.simpleText || '';
+        const videoCount = ch.videoCountText?.runs?.map(r => r.text).join('') || '';
+        results.push({ channelId, title, thumbnail, subText, videoCount });
+      }
+    }
+    return results;
+  } catch(e) {
+    console.warn('ytInitialData parse error:', e);
+    return null;
+  }
+}
+
+async function doChannelSearch() {
+  const input = document.getElementById('ch-search-input');
+  const resultsEl = document.getElementById('ch-search-results');
+  const query = (input?.value || '').trim();
+  if (!query) return;
+
+  resultsEl.innerHTML = '<div class="ch-search-loading"><div class="spinner">🔄</div><div>' + escHtml(t('channels.searching')) + '</div></div>';
+
+  const results = await searchYouTubeChannels(query);
+
+  if (!results || results.length === 0) {
+    resultsEl.innerHTML = '<div class="ch-search-empty">' + escHtml(t(results === null ? 'channels.searchError' : 'channels.noResults')) + '</div>';
+    return;
+  }
+
+  const existingIds = new Set(Object.values(data.channels).map(c => c.channelId));
+
+  resultsEl.innerHTML = results.map(ch => {
+    const isAdded = existingIds.has(ch.channelId);
+    const thumbUrl = ch.thumbnail.startsWith('//') ? 'https:' + ch.thumbnail : ch.thumbnail;
+    return '<div class="ch-search-result">' +
+      '<img src="' + escHtml(thumbUrl) + '" alt="" loading="lazy">' +
+      '<div class="ch-result-info">' +
+      '<div class="ch-result-name">' + escHtml(ch.title) + '</div>' +
+      '<div class="ch-result-meta">' + escHtml(ch.subText + (ch.videoCount ? ' · ' + ch.videoCount : '')) + '</div>' +
+      '</div>' +
+      (isAdded
+        ? '<span class="ch-result-added">' + escHtml(t('channels.addedBtn')) + '</span>'
+        : '<button class="ch-result-add" onclick="addChannelFromSearch(\'' + escAttr(ch.channelId) + '\',\'' + escAttr(ch.title) + '\',\'' + escAttr(thumbUrl) + '\',this)">' + escHtml(t('channels.addBtn')) + '</button>') +
+      '</div>';
+  }).join('');
+}
+
+async function addChannelFromSearch(channelId, title, thumbnail, btnEl) {
+  // Check duplicate
+  const existing = Object.values(data.channels).find(c => c.channelId === channelId);
+  if (existing) {
+    showToast(t('channels.alreadyExists'));
+    return;
+  }
+
+  const categoryId = document.getElementById('add-channel-category-search')?.value || null;
+
+  const id = generateId();
+  data.channels[id] = {
+    channelId: channelId,
+    title: title,
+    thumbnail: thumbnail,
+    addedAt: Date.now(),
+    categoryId: categoryId || null
+  };
+
+  saveData();
+  renderChannels();
+  showToast(t('channels.added'));
+
+  // Update button to "Added"
+  if (btnEl) {
+    const span = document.createElement('span');
+    span.className = 'ch-result-added';
+    span.textContent = t('channels.addedBtn');
+    btnEl.parentNode.replaceChild(span, btnEl);
+  }
 }
 
 async function addChannelFromUrl(url, categoryId) {
