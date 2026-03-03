@@ -738,6 +738,14 @@ const TRANSLATIONS = {
     'channels.searchError': '검색에 실패했습니다. 다시 시도해주세요',
     'channels.addBtn': '추가',
     'channels.addedBtn': '추가됨',
+    'cat.music': '음악',
+    'cat.gaming': '게임',
+    'cat.education': '교육',
+    'cat.entertainment': '엔터테인먼트',
+    'cat.tech': '과학/기술',
+    'cat.sports': '스포츠',
+    'cat.news': '뉴스/시사',
+    'cat.lifestyle': '생활/노하우',
   },
   ja: {
     'app.title': 'MyTube',
@@ -845,6 +853,14 @@ const TRANSLATIONS = {
     'channels.searchError': '検索に失敗しました。もう一度お試しください',
     'channels.addBtn': '追加',
     'channels.addedBtn': '追加済み',
+    'cat.music': '音楽',
+    'cat.gaming': 'ゲーム',
+    'cat.education': '教育',
+    'cat.entertainment': 'エンタメ',
+    'cat.tech': '科学/テクノロジー',
+    'cat.sports': 'スポーツ',
+    'cat.news': 'ニュース',
+    'cat.lifestyle': '生活/ハウツー',
   },
   en: {
     'app.title': 'MyTube',
@@ -952,6 +968,14 @@ const TRANSLATIONS = {
     'channels.searchError': 'Search failed. Please try again',
     'channels.addBtn': 'Add',
     'channels.addedBtn': 'Added',
+    'cat.music': 'Music',
+    'cat.gaming': 'Gaming',
+    'cat.education': 'Education',
+    'cat.entertainment': 'Entertainment',
+    'cat.tech': 'Science/Tech',
+    'cat.sports': 'Sports',
+    'cat.news': 'News',
+    'cat.lifestyle': 'Lifestyle/Howto',
   }
 };
 
@@ -1005,6 +1029,96 @@ let searchQuery = '';
 let ytPlayer = null;
 let ytReady = false;
 
+// ============== Default Categories & Auto-Categorization ==============
+const DEFAULT_CATEGORY_DEFS = [
+  { id: 'cat_music',         icon: '🎵', key: 'cat.music' },
+  { id: 'cat_gaming',        icon: '🎮', key: 'cat.gaming' },
+  { id: 'cat_education',     icon: '📚', key: 'cat.education' },
+  { id: 'cat_entertainment', icon: '🎬', key: 'cat.entertainment' },
+  { id: 'cat_tech',          icon: '🔬', key: 'cat.tech' },
+  { id: 'cat_sports',        icon: '💪', key: 'cat.sports' },
+  { id: 'cat_news',          icon: '📰', key: 'cat.news' },
+  { id: 'cat_lifestyle',     icon: '🍳', key: 'cat.lifestyle' },
+];
+
+const YT_GENRE_TO_CATEGORY = {
+  'Music':                  'cat_music',
+  'Gaming':                 'cat_gaming',
+  'Education':              'cat_education',
+  'Entertainment':          'cat_entertainment',
+  'Film & Animation':       'cat_entertainment',
+  'Comedy':                 'cat_entertainment',
+  'Science & Technology':   'cat_tech',
+  'Sports':                 'cat_sports',
+  'News & Politics':        'cat_news',
+  'Howto & Style':          'cat_lifestyle',
+  'People & Blogs':         'cat_lifestyle',
+  'Pets & Animals':         'cat_lifestyle',
+  'Travel & Events':        'cat_lifestyle',
+  'Autos & Vehicles':       'cat_lifestyle',
+  'Nonprofits & Activism':  'cat_news',
+};
+
+function initDefaultCategories() {
+  if (data.settings.defaultCategoriesCreated) return;
+  if (Object.keys(data.categories).length > 0) {
+    data.settings.defaultCategoriesCreated = true;
+    return;
+  }
+  DEFAULT_CATEGORY_DEFS.forEach(def => {
+    data.categories[def.id] = { name: t(def.key), icon: def.icon, color: null };
+  });
+  data.settings.defaultCategoriesCreated = true;
+  saveData();
+}
+
+async function fetchVideoGenre(videoId) {
+  const url = 'https://www.youtube.com/watch?v=' + videoId;
+  const html = await corsGet(url);
+  if (!html) return null;
+  // Try "category":"Genre" in ytInitialPlayerResponse
+  let m = html.match(/"category"\s*:\s*"([^"]+)"/);
+  if (m) {
+    // Decode unicode escapes like \u0026 → &
+    return m[1].replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+  }
+  // Fallback: <meta itemprop="genre" content="...">
+  m = html.match(/itemprop="genre"\s+content="([^"]+)"/);
+  if (m) return m[1];
+  return null;
+}
+
+function mapGenreToCategory(genre) {
+  if (!genre) return null;
+  return YT_GENRE_TO_CATEGORY[genre] || null;
+}
+
+async function autoCategorizeVideo(id, videoId) {
+  try {
+    const genre = await fetchVideoGenre(videoId);
+    const catId = mapGenreToCategory(genre);
+    if (catId && data.videos[id] && !data.videos[id].categoryId) {
+      data.videos[id].categoryId = catId;
+      saveData();
+      renderVideos();
+    }
+  } catch(e) { /* ignore */ }
+}
+
+async function autoCategorizeChannel(id, channelId) {
+  try {
+    const rss = await fetchChannelRSS(channelId);
+    if (!rss || rss.videos.length === 0) return;
+    const genre = await fetchVideoGenre(rss.videos[0].videoId);
+    const catId = mapGenreToCategory(genre);
+    if (catId && data.channels[id] && !data.channels[id].categoryId) {
+      data.channels[id].categoryId = catId;
+      saveData();
+      renderChannels();
+    }
+  } catch(e) { /* ignore */ }
+}
+
 // ============== Data Persistence ==============
 function loadData() {
   try {
@@ -1018,6 +1132,7 @@ function loadData() {
       if (!data.settings) data.settings = {};
     }
   } catch(e) { console.warn('localStorage load error', e); }
+  initDefaultCategories();
 }
 
 function saveData() {
@@ -1311,6 +1426,10 @@ async function fetchVideoInfo(id, videoId) {
       }
     }
   } catch(e) { /* ignore — thumbnail still shows */ }
+  // Auto-categorize if no category was manually selected
+  if (data.videos[id] && !data.videos[id].categoryId) {
+    autoCategorizeVideo(id, videoId);
+  }
 }
 
 function renderVideos() {
@@ -1720,6 +1839,11 @@ async function addChannelFromSearch(channelId, title, thumbnail, btnEl) {
     span.textContent = t('channels.addedBtn');
     btnEl.parentNode.replaceChild(span, btnEl);
   }
+
+  // Auto-categorize from channel's first video
+  if (!categoryId) {
+    autoCategorizeChannel(id, channelId);
+  }
 }
 
 async function addChannelFromUrl(url, categoryId) {
@@ -1775,6 +1899,18 @@ async function addChannelFromUrl(url, categoryId) {
     closeModal();
     renderChannels();
     showToast(t('channels.added'));
+
+    // Auto-categorize from first video's genre
+    if (!categoryId && rssData && rssData.videos.length > 0) {
+      fetchVideoGenre(rssData.videos[0].videoId).then(genre => {
+        const catId = mapGenreToCategory(genre);
+        if (catId && data.channels[id] && !data.channels[id].categoryId) {
+          data.channels[id].categoryId = catId;
+          saveData();
+          renderChannels();
+        }
+      }).catch(() => {});
+    }
   } catch(e) {
     console.warn('addChannel error:', e);
     if (loadingEl) loadingEl.style.display = 'none';
