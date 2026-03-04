@@ -589,6 +589,19 @@ body {
   </div>
 </div>
 
+<!-- ============== Section: History ============== -->
+<div id="sec-history" class="section">
+  <div class="history-header" id="history-header" style="display:none;padding:8px 16px;text-align:right;">
+    <button class="btn btn-sm btn-secondary" onclick="clearPlayHistory()" data-i18n="history.clearAll">전체 삭제</button>
+  </div>
+  <div class="video-grid" id="history-grid"></div>
+  <div id="history-empty" class="empty-state" style="display:none;">
+    <div class="icon">🕐</div>
+    <div class="title" data-i18n="history.emptyTitle">재생 이력이 없습니다</div>
+    <div class="desc" data-i18n="history.emptyDesc">영상을 재생하면 여기에 기록됩니다</div>
+  </div>
+</div>
+
 <!-- ============== Player Overlay ============== -->
 <div id="player-overlay" class="player-overlay" style="display:none;">
   <div class="player-overlay-header">
@@ -645,6 +658,9 @@ body {
     <button class="tab" data-tab="channels" onclick="switchTab('channels')">
       <span class="tab-icon">📡</span><span data-i18n="tab.channels">내 채널</span>
     </button>
+    <button class="tab" data-tab="history" onclick="switchTab('history')">
+      <span class="tab-icon">🕐</span><span data-i18n="tab.history">재생 이력</span>
+    </button>
   </div>
 </div>
 
@@ -699,9 +715,16 @@ const TRANSLATIONS = {
     'app.subtitle': '나만의 유튜브',
     'tab.videos': '내 영상',
     'tab.channels': '내 채널',
+    'tab.history': '재생 이력',
     'tab.player': '플레이어',
     'header.settings': '설정',
     'search.placeholder': '검색...',
+    'history.emptyTitle': '재생 이력이 없습니다',
+    'history.emptyDesc': '영상을 재생하면 여기에 기록됩니다',
+    'history.clearAll': '전체 삭제',
+    'history.clearConfirm': '재생 이력을 모두 삭제하시겠습니까?',
+    'history.today': '오늘',
+    'history.yesterday': '어제',
     'videos.emptyTitle': '아직 추가된 영상이 없어요',
     'videos.emptyDesc': '+ 버튼을 눌러 YouTube 영상을 추가하세요',
     'videos.addTitle': '영상 추가',
@@ -830,8 +853,15 @@ const TRANSLATIONS = {
     'app.subtitle': 'マイYouTube',
     'tab.videos': 'マイ動画',
     'tab.channels': 'マイチャンネル',
+    'tab.history': '再生履歴',
     'tab.player': 'プレイヤー',
     'header.settings': '設定',
+    'history.emptyTitle': '再生履歴がありません',
+    'history.emptyDesc': '動画を再生するとここに記録されます',
+    'history.clearAll': '全て削除',
+    'history.clearConfirm': '再生履歴を全て削除しますか？',
+    'history.today': '今日',
+    'history.yesterday': '昨日',
     'search.placeholder': '検索...',
     'videos.emptyTitle': 'まだ動画がありません',
     'videos.emptyDesc': '+ボタンを押してYouTube動画を追加しましょう',
@@ -961,8 +991,15 @@ const TRANSLATIONS = {
     'app.subtitle': 'My Curated YouTube',
     'tab.videos': 'My Videos',
     'tab.channels': 'My Channels',
+    'tab.history': 'History',
     'tab.player': 'Player',
     'header.settings': 'Settings',
+    'history.emptyTitle': 'No play history',
+    'history.emptyDesc': 'Videos you play will appear here',
+    'history.clearAll': 'Clear All',
+    'history.clearConfirm': 'Clear all play history?',
+    'history.today': 'Today',
+    'history.yesterday': 'Yesterday',
     'search.placeholder': 'Search...',
     'videos.emptyTitle': 'No videos yet',
     'videos.emptyDesc': 'Tap + to add a YouTube video',
@@ -1131,7 +1168,8 @@ let data = {
   channels: {},
   categories: {},
   settings: { darkMode: false, language: null, shortsFilter: true, defaultView: 'grid' },
-  watchLog: { totalSeconds: 0, channels: {}, videos: {} }
+  watchLog: { totalSeconds: 0, channels: {}, videos: {} },
+  playHistory: []
 };
 let activeTab = 'videos';
 let activeCategory = null;
@@ -1242,6 +1280,7 @@ function loadData() {
       if (!data.categories) data.categories = {};
       if (!data.settings) data.settings = {};
       if (!data.watchLog) data.watchLog = { totalSeconds: 0, channels: {}, videos: {} };
+      if (!data.playHistory) data.playHistory = [];
     }
   } catch(e) { console.warn('localStorage load error', e); }
   initDefaultCategories();
@@ -1307,7 +1346,7 @@ function showConfirm(msg, onConfirm) {
 }
 
 // ============== Tab Switching ==============
-const TAB_ORDER = ['videos', 'channels'];
+const TAB_ORDER = ['videos', 'channels', 'history'];
 
 function switchTab(tab) {
   activeTab = tab;
@@ -1323,6 +1362,7 @@ function switchTab(tab) {
 
   if (tab === 'videos') renderVideos();
   if (tab === 'channels') renderChannels();
+  if (tab === 'history') renderHistory();
 }
 
 // Swipe gesture
@@ -1652,7 +1692,23 @@ function playVideoById(videoId, title, channel) {
     '<button class="btn btn-sm btn-secondary" onclick="openTranscript(\'' + escAttr(videoId) + '\',\'' + escAttr(title || '') + '\')">📝</button>';
 }
 
+function recordPlayHistory(videoId, title, channel) {
+  if (!data.playHistory) data.playHistory = [];
+  // Remove duplicate if exists (move to top)
+  data.playHistory = data.playHistory.filter(h => h.videoId !== videoId);
+  data.playHistory.unshift({
+    videoId: videoId,
+    title: title || videoId,
+    channel: channel || '',
+    playedAt: Date.now()
+  });
+  // Keep last 200 entries
+  if (data.playHistory.length > 200) data.playHistory = data.playHistory.slice(0, 200);
+  saveData();
+}
+
 function openPlayerOverlay(videoId, title, channel) {
+  recordPlayHistory(videoId, title, channel);
   const overlay = document.getElementById('player-overlay');
   overlay.style.display = 'block';
   document.getElementById('player-overlay-title').textContent = title || videoId;
@@ -2748,6 +2804,74 @@ function buildWatchStatsHtml() {
   return html;
 }
 
+// ============== Play History ==============
+function getDateLabel(timestamp) {
+  const d = new Date(timestamp);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  const itemDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (itemDate.getTime() === today.getTime()) return t('history.today');
+  if (itemDate.getTime() === yesterday.getTime()) return t('history.yesterday');
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function formatTime(timestamp) {
+  const d = new Date(timestamp);
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function renderHistory() {
+  const grid = document.getElementById('history-grid');
+  const emptyEl = document.getElementById('history-empty');
+  const headerEl = document.getElementById('history-header');
+  const history = data.playHistory || [];
+
+  if (history.length === 0) {
+    grid.innerHTML = '';
+    emptyEl.style.display = '';
+    headerEl.style.display = 'none';
+    return;
+  }
+
+  emptyEl.style.display = 'none';
+  headerEl.style.display = '';
+  let html = '';
+  let lastDate = '';
+
+  history.forEach((h, i) => {
+    const dateLabel = getDateLabel(h.playedAt);
+    if (dateLabel !== lastDate) {
+      lastDate = dateLabel;
+      html += '<div style="grid-column:1/-1;padding:8px 0 4px;font-size:13px;font-weight:700;color:var(--text-light);border-bottom:1px solid var(--border);">' +
+        escHtml(dateLabel) + '</div>';
+    }
+    const thumbUrl = 'https://i.ytimg.com/vi/' + encodeURIComponent(h.videoId) + '/mqdefault.jpg';
+    html += '<div class="video-card" onclick="playVideoById(\'' + escAttr(h.videoId) + '\',\'' + escAttr(h.title) + '\',\'' + escAttr(h.channel) + '\')">' +
+      '<div class="card-thumb"><img src="' + escHtml(thumbUrl) + '" alt="" loading="lazy">' +
+      '<span class="time-badge">' + escHtml(formatTime(h.playedAt)) + '</span></div>' +
+      '<div class="card-body"><div class="card-title">' + escHtml(h.title) + '</div>' +
+      '<div class="card-channel">' + escHtml(h.channel) + '</div></div>' +
+      '<button class="btn btn-sm btn-secondary" style="position:absolute;top:4px;right:4px;min-width:auto;padding:2px 6px;font-size:11px;" ' +
+      'onclick="event.stopPropagation();removeHistoryItem(' + i + ')">✕</button></div>';
+  });
+  grid.innerHTML = html;
+}
+
+function removeHistoryItem(index) {
+  if (!data.playHistory) return;
+  data.playHistory.splice(index, 1);
+  saveData();
+  renderHistory();
+}
+
+function clearPlayHistory() {
+  if (!confirm(t('history.clearConfirm'))) return;
+  data.playHistory = [];
+  saveData();
+  renderHistory();
+}
+
 function toggleSettingsDark() {
   const el = document.getElementById('toggle-dark');
   el.classList.toggle('active');
@@ -2884,6 +3008,7 @@ async function syncToCloud() {
       categories: data.categories || {},
       settings: data.settings || {},
       watchLog: data.watchLog || { totalSeconds: 0, channels: {}, videos: {} },
+      playHistory: data.playHistory || [],
       lastSync: now
     }, { merge: true });
 
@@ -2911,6 +3036,7 @@ async function syncFromCloud() {
       if (d.categories) data.categories = d.categories;
       if (d.settings) data.settings = { ...data.settings, ...d.settings };
       if (d.watchLog) data.watchLog = d.watchLog;
+      if (d.playHistory) data.playHistory = d.playHistory;
     }
     localStorage.setItem('myTube', JSON.stringify(data));
     lastSyncTime = Date.now();
