@@ -12,11 +12,12 @@
   script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com https://www.gstatic.com https://apis.google.com;
   style-src 'self' 'unsafe-inline';
   img-src 'self' data: https://i.ytimg.com https://yt3.ggpht.com https://yt3.googleusercontent.com https://lh3.googleusercontent.com https:;
-  connect-src 'self' https://*.googleapis.com https://*.google.com https://www.youtube.com https://api.allorigins.win https://corsproxy.io;
+  connect-src 'self' https://*.googleapis.com https://*.google.com https://www.youtube.com https://api.allorigins.win https://corsproxy.io https://api.codetabs.com;
   font-src 'self';
   frame-src https://www.youtube.com https://www.youtube-nocookie.com https://*.firebaseapp.com;">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-startup-image" href="icon-512.png">
 <title>MyTube - 나만의 유튜브</title>
 <style>
 /* ============== CSS Variables ============== */
@@ -1970,14 +1971,21 @@ function closeTranscript() {
 // ============== CORS Proxy ==============
 const CORS_PROXIES = [
   'https://corsproxy.io/?',
+  'https://api.codetabs.com/v1/proxy?quest=',
   'https://api.allorigins.win/raw?url='
 ];
 async function corsGet(url) {
   for (const proxy of CORS_PROXIES) {
     try {
-      const resp = await fetch(proxy + encodeURIComponent(url));
-      if (resp.ok) return await resp.text();
-    } catch(e) { /* try next */ }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      const resp = await fetch(proxy + encodeURIComponent(url), { signal: controller.signal });
+      clearTimeout(timer);
+      if (resp.ok) {
+        const text = await resp.text();
+        if (text && text.length > 100) return text;
+      }
+    } catch(e) { /* try next proxy */ }
   }
   return null;
 }
