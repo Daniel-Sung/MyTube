@@ -594,7 +594,7 @@ body {
   <div class="history-header" id="history-header" style="display:none;padding:8px 16px;text-align:right;">
     <button class="btn btn-sm btn-secondary" onclick="clearPlayHistory()" data-i18n="history.clearAll">전체 삭제</button>
   </div>
-  <div class="video-grid" id="history-grid"></div>
+  <div id="history-grid"></div>
   <div id="history-empty" class="empty-state" style="display:none;">
     <div class="icon">🕐</div>
     <div class="title" data-i18n="history.emptyTitle">재생 이력이 없습니다</div>
@@ -843,7 +843,7 @@ const TRANSLATIONS = {
     'stats.hours': '시간',
     'stats.minutes': '분',
     'stats.seconds': '초',
-    'channels.popularVideos': '인기 영상',
+    'channels.popularVideos': '최신 영상',
     'channels.rssVideos': '최신 영상 (RSS)',
     'video.views': '조회수',
     'video.duration': '길이',
@@ -981,7 +981,7 @@ const TRANSLATIONS = {
     'stats.hours': '時間',
     'stats.minutes': '分',
     'stats.seconds': '秒',
-    'channels.popularVideos': '人気動画',
+    'channels.popularVideos': '最新動画',
     'channels.rssVideos': '最新動画 (RSS)',
     'video.views': '再生回数',
     'video.duration': '長さ',
@@ -1119,7 +1119,7 @@ const TRANSLATIONS = {
     'stats.hours': 'h',
     'stats.minutes': 'm',
     'stats.seconds': 's',
-    'channels.popularVideos': 'Popular Videos',
+    'channels.popularVideos': 'Latest Videos',
     'channels.rssVideos': 'Latest Videos (RSS)',
     'video.views': 'views',
     'video.duration': 'duration',
@@ -1356,9 +1356,9 @@ function switchTab(tab) {
   const btn = document.querySelector('.tab[data-tab="' + tab + '"]');
   if (btn) btn.classList.add('active');
 
-  // Show FAB
+  // Show/hide FAB (hide on history tab)
   const fab = document.getElementById('fab');
-  fab.style.display = 'flex';
+  fab.style.display = (tab === 'history') ? 'none' : 'flex';
 
   if (tab === 'videos') renderVideos();
   if (tab === 'channels') renderChannels();
@@ -2415,7 +2415,7 @@ async function fetchChannelRSS(channelId) {
 
 // ============== Channel Scraping (Popular Videos) ==============
 async function fetchChannelPopularVideos(channelId) {
-  const url = 'https://www.youtube.com/channel/' + channelId + '/videos?view=0&sort=p';
+  const url = 'https://www.youtube.com/channel/' + channelId + '/videos?view=0&sort=dd';
   const html = await corsGet(url);
   if (!html) return null;
 
@@ -2446,9 +2446,9 @@ async function fetchChannelPopularVideos(channelId) {
         const durationText = video.lengthText?.simpleText || '';
         const durationSeconds = parseDuration(durationText);
 
-        // Check if Shorts
-        const isShorts = (
-          durationSeconds > 0 && durationSeconds < 61
+        // Filter: Shorts or under 2 minutes
+        const isShortOrTooShort = (
+          durationSeconds > 0 && durationSeconds < 120
         ) || (
           video.thumbnailOverlays?.some(o =>
             o?.thumbnailOverlayTimeStatusRenderer?.style === 'SHORTS'
@@ -2457,7 +2457,7 @@ async function fetchChannelPopularVideos(channelId) {
           video.navigationEndpoint?.commandMetadata?.webCommandMetadata?.url?.includes('/shorts/')
         );
 
-        if (!isShorts) {
+        if (!isShortOrTooShort) {
           items.push({ videoId, title, thumbnail, viewText, durationText, durationSeconds });
         }
       }
@@ -2843,16 +2843,18 @@ function renderHistory() {
     const dateLabel = getDateLabel(h.playedAt);
     if (dateLabel !== lastDate) {
       lastDate = dateLabel;
-      html += '<div style="grid-column:1/-1;padding:8px 0 4px;font-size:13px;font-weight:700;color:var(--text-light);border-bottom:1px solid var(--border);">' +
+      html += '<div style="padding:10px 16px 4px;font-size:13px;font-weight:700;color:var(--text-light);border-bottom:1px solid var(--border);">' +
         escHtml(dateLabel) + '</div>';
     }
-    const thumbUrl = 'https://i.ytimg.com/vi/' + encodeURIComponent(h.videoId) + '/mqdefault.jpg';
-    html += '<div class="video-card" onclick="playVideoById(\'' + escAttr(h.videoId) + '\',\'' + escAttr(h.title) + '\',\'' + escAttr(h.channel) + '\')">' +
-      '<div class="card-thumb"><img src="' + escHtml(thumbUrl) + '" alt="" loading="lazy">' +
-      '<span class="time-badge">' + escHtml(formatTime(h.playedAt)) + '</span></div>' +
-      '<div class="card-body"><div class="card-title">' + escHtml(h.title) + '</div>' +
-      '<div class="card-channel">' + escHtml(h.channel) + '</div></div>' +
-      '<button class="btn btn-sm btn-secondary" style="position:absolute;top:4px;right:4px;min-width:auto;padding:2px 6px;font-size:11px;" ' +
+    const thumbUrl = 'https://i.ytimg.com/vi/' + encodeURIComponent(h.videoId) + '/default.jpg';
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--border);cursor:pointer;" ' +
+      'onclick="playVideoById(\'' + escAttr(h.videoId) + '\',\'' + escAttr(h.title) + '\',\'' + escAttr(h.channel) + '\')">' +
+      '<img src="' + escHtml(thumbUrl) + '" alt="" loading="lazy" style="width:60px;height:45px;object-fit:cover;border-radius:4px;flex-shrink:0;">' +
+      '<div style="flex:1;min-width:0;">' +
+      '<div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(h.title) + '</div>' +
+      '<div style="font-size:11px;color:var(--text-sub);margin-top:2px;">' + escHtml(h.channel) +
+      ' · ' + escHtml(formatTime(h.playedAt)) + '</div></div>' +
+      '<button style="background:none;border:none;color:var(--text-light);font-size:14px;cursor:pointer;padding:4px;" ' +
       'onclick="event.stopPropagation();removeHistoryItem(' + i + ')">✕</button></div>';
   });
   grid.innerHTML = html;
