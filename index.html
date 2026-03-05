@@ -843,6 +843,7 @@ const TRANSLATIONS = {
     'stats.hours': '시간',
     'stats.minutes': '분',
     'stats.seconds': '초',
+    'channels.refresh': '최신 영상 갱신',
     'channels.popularVideos': '최신 영상',
     'channels.rssVideos': '최신 영상 (RSS)',
     'video.views': '조회수',
@@ -981,6 +982,7 @@ const TRANSLATIONS = {
     'stats.hours': '時間',
     'stats.minutes': '分',
     'stats.seconds': '秒',
+    'channels.refresh': '最新動画を更新',
     'channels.popularVideos': '最新動画',
     'channels.rssVideos': '最新動画 (RSS)',
     'video.views': '再生回数',
@@ -1119,6 +1121,7 @@ const TRANSLATIONS = {
     'stats.hours': 'h',
     'stats.minutes': 'm',
     'stats.seconds': 's',
+    'channels.refresh': 'Refresh Videos',
     'channels.popularVideos': 'Latest Videos',
     'channels.rssVideos': 'Latest Videos (RSS)',
     'video.views': 'views',
@@ -1952,38 +1955,14 @@ async function openTranscript(videoId, title) {
   body.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><div class="title">' + escHtml(t('transcript.loading')) + '</div></div>';
 
   try {
-    const pageUrl = 'https://www.youtube.com/watch?v=' + videoId;
-    let html = await corsGet(pageUrl);
-    if (!html) { body.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div class="title">' + escHtml(t('transcript.error')) + '</div></div>'; return; }
-
-    // Decode \x escape sequences if present (mobile YouTube pages)
-    if (html.match(/\\x[0-9a-fA-F]{2}/)) {
-      html = decodeJsEscapes(html);
-    }
-
-    // Extract captions from ytInitialPlayerResponse
     let tracks = [];
-    // Method 1: Find captionTracks in the player response
-    const m1 = html.match(/"captionTracks"\s*:\s*(\[[\s\S]*?\])\s*[,}]/);
-    if (m1) {
-      try { tracks = JSON.parse(m1[1]); } catch(e) {}
-    }
-    // Method 2: Find captions object with captionTracks
-    if (tracks.length === 0) {
-      const m2 = html.match(/"captions"\s*:\s*\{[^}]*"captionTracks"\s*:\s*(\[[\s\S]*?\])/);
-      if (m2) {
-        try { tracks = JSON.parse(m2[1]); } catch(e) {}
-      }
-    }
-    // Method 3: Try ytInitialPlayerResponse as a whole
-    if (tracks.length === 0) {
-      const m3 = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});\s*(?:var|<\/script>)/s);
-      if (m3) {
-        try {
-          const pr = JSON.parse(m3[1]);
-          tracks = pr?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
-        } catch(e) {}
-      }
+
+    // Method A: YouTube timedtext list API (most reliable)
+    tracks = await fetchTimedTextList(videoId);
+
+    // Method B: Scrape YouTube watch page for captionTracks
+    if (!tracks || tracks.length === 0) {
+      tracks = await scrapeCaptionTracks(videoId);
     }
 
     if (!tracks || tracks.length === 0) {
@@ -1996,7 +1975,7 @@ async function openTranscript(videoId, title) {
     if (tracks.length > 1) {
       langSel.style.display = 'block';
       langSel.innerHTML = tracks.map((tr, i) =>
-        '<option value="' + i + '">' + escHtml(tr.name?.simpleText || tr.languageCode || ('Track ' + (i+1))) + '</option>'
+        '<option value="' + i + '">' + escHtml(tr.name?.simpleText || tr.name || tr.languageCode || ('Track ' + (i+1))) + '</option>'
       ).join('');
     }
 
@@ -2005,6 +1984,77 @@ async function openTranscript(videoId, title) {
     console.warn('Transcript error:', e);
     body.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div class="title">' + escHtml(t('transcript.error')) + '</div></div>';
   }
+}
+
+// Fetch caption track list via YouTube timedtext API
+async function fetchTimedTextList(videoId) {
+  const listUrl = 'https://www.youtube.com/api/timedtext?type=list&v=' + videoId;
+  const xml = await corsGet(listUrl);
+  if (!xml) return [];
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, 'text/xml');
+    if (doc.querySelector('parsererror')) return [];
+
+    const trackEls = doc.querySelectorAll('track');
+    if (trackEls.length === 0) return [];
+
+    const tracks = [];
+    trackEls.forEach(el => {
+      const langCode = el.getAttribute('lang_code') || '';
+      const langName = el.getAttribute('lang_translated') || el.getAttribute('lang_original') || langCode;
+      const name = el.getAttribute('name') || '';
+      const baseUrl = 'https://www.youtube.com/api/timedtext?v=' + videoId +
+        '&lang=' + encodeURIComponent(langCode) +
+        (name ? '&name=' + encodeURIComponent(name) : '');
+      tracks.push({
+        baseUrl: baseUrl,
+        languageCode: langCode,
+        name: { simpleText: langName }
+      });
+    });
+    return tracks;
+  } catch(e) {
+    console.warn('timedtext list parse error:', e);
+    return [];
+  }
+}
+
+// Scrape captionTracks from YouTube watch page (fallback)
+async function scrapeCaptionTracks(videoId) {
+  const pageUrl = 'https://www.youtube.com/watch?v=' + videoId;
+  let html = await corsGet(pageUrl);
+  if (!html) return [];
+
+  if (html.match(/\\x[0-9a-fA-F]{2}/)) {
+    html = decodeJsEscapes(html);
+  }
+
+  let tracks = [];
+  // Method 1: Find captionTracks in the player response
+  const m1 = html.match(/"captionTracks"\s*:\s*(\[[\s\S]*?\])\s*[,}]/);
+  if (m1) {
+    try { tracks = JSON.parse(m1[1]); } catch(e) {}
+  }
+  // Method 2: Find captions object with captionTracks
+  if (tracks.length === 0) {
+    const m2 = html.match(/"captions"\s*:\s*\{[^}]*"captionTracks"\s*:\s*(\[[\s\S]*?\])/);
+    if (m2) {
+      try { tracks = JSON.parse(m2[1]); } catch(e) {}
+    }
+  }
+  // Method 3: Try ytInitialPlayerResponse as a whole
+  if (tracks.length === 0) {
+    const m3 = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});\s*(?:var|<\/script>)/s);
+    if (m3) {
+      try {
+        const pr = JSON.parse(m3[1]);
+        tracks = pr?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+      } catch(e) {}
+    }
+  }
+  return tracks;
 }
 
 async function loadTranscriptTrack(index) {
@@ -2549,6 +2599,7 @@ function renderChannels() {
       '<div class="ch-name">' + escHtml(c.title || c.channelId) + '</div>' +
       '</div>' +
       '<div class="ch-actions">' +
+      '<button onclick="event.stopPropagation();openChannelVideos(\'' + escAttr(c.id) + '\')" title="' + escAttr(t('channels.refresh')) + '">🔄</button>' +
       '<button onclick="event.stopPropagation();deleteChannel(\'' + escAttr(c.id) + '\')" title="' + escAttr(t('videos.delete')) + '">🗑</button>' +
       '</div></div>';
   }).join('');
