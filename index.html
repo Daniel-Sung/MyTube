@@ -1169,7 +1169,8 @@ let data = {
   categories: {},
   settings: { darkMode: false, language: null, shortsFilter: true, defaultView: 'grid' },
   watchLog: { totalSeconds: 0, channels: {}, videos: {} },
-  playHistory: []
+  playHistory: [],
+  playbackPositions: {}
 };
 let activeTab = 'videos';
 let activeCategory = null;
@@ -1281,6 +1282,7 @@ function loadData() {
       if (!data.settings) data.settings = {};
       if (!data.watchLog) data.watchLog = { totalSeconds: 0, channels: {}, videos: {} };
       if (!data.playHistory) data.playHistory = [];
+      if (!data.playbackPositions) data.playbackPositions = {};
     }
   } catch(e) { console.warn('localStorage load error', e); }
   initDefaultCategories();
@@ -1497,10 +1499,6 @@ function showAddVideoModal() {
     '<div id="add-video-error" style="color:var(--danger);font-size:12px;margin-top:4px;display:none;"></div>' +
     '</div>' +
     '<div id="add-video-preview" style="display:none;margin-bottom:12px;"></div>' +
-    '<div class="form-group">' +
-    '<label>' + escHtml(t('categories.title')) + '</label>' +
-    '<select id="add-video-category">' + getCategoryOptions() + '</select>' +
-    '</div>' +
     '<div class="modal-actions">' +
     '<button class="btn btn-secondary" onclick="closeModal()">' + escHtml(t('videos.cancel')) + '</button>' +
     '<button class="btn btn-primary" id="add-video-btn">' + escHtml(t('videos.add')) + '</button>' +
@@ -1528,7 +1526,7 @@ function showAddVideoModal() {
   });
 
   document.getElementById('add-video-btn').onclick = function() {
-    addVideoFromUrl(urlInput.value, document.getElementById('add-video-category').value);
+    addVideoFromUrl(urlInput.value, null);
   };
 }
 
@@ -1721,14 +1719,36 @@ function openPlayerOverlay(videoId, title, channel) {
   if (ytReady) {
     createPlayer(videoId);
   } else {
+    const fallbackStart = (data.playbackPositions && data.playbackPositions[videoId]) || 0;
     document.getElementById('yt-player-container').innerHTML =
       '<iframe src="https://www.youtube-nocookie.com/embed/' + videoId +
-      '?rel=0&playsinline=1&modestbranding=1&autoplay=1" allowfullscreen allow="autoplay"></iframe>';
+      '?rel=0&playsinline=1&modestbranding=1&autoplay=1' + (fallbackStart ? '&start=' + fallbackStart : '') +
+      '" allowfullscreen allow="autoplay"></iframe>';
     enterPlayerFullscreen();
   }
 }
 
+function savePlaybackPosition() {
+  if (currentPlayingVideoId && ytPlayer && ytPlayer.getCurrentTime) {
+    try {
+      const pos = Math.floor(ytPlayer.getCurrentTime());
+      const dur = Math.floor(ytPlayer.getDuration() || 0);
+      // Don't save if near the end (within 10 seconds) or at the start
+      if (pos > 5 && dur > 0 && pos < dur - 10) {
+        if (!data.playbackPositions) data.playbackPositions = {};
+        data.playbackPositions[currentPlayingVideoId] = pos;
+      } else {
+        // Clear position if finished or near start
+        if (data.playbackPositions) delete data.playbackPositions[currentPlayingVideoId];
+      }
+      saveData();
+    } catch(e) {}
+  }
+}
+
 function closePlayerOverlay() {
+  // Save playback position before stopping
+  savePlaybackPosition();
   // Stop watch time tracking
   stopWatchTimer();
   // Stop player
@@ -1748,13 +1768,15 @@ function createPlayer(videoId) {
   const container = document.getElementById('yt-player-container');
   container.innerHTML = '<div id="yt-player-div"></div>';
 
+  const savedPos = (data.playbackPositions && data.playbackPositions[videoId]) || 0;
   ytPlayer = new YT.Player('yt-player-div', {
     videoId: videoId,
     playerVars: {
       rel: 0,
       playsinline: 1,
       modestbranding: 1,
-      autoplay: 1
+      autoplay: 1,
+      start: savedPos
     },
     events: {
       onReady: function() {
@@ -1765,8 +1787,14 @@ function createPlayer(videoId) {
           watchStartTime = Date.now();
         } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
           accumulateWatchTime();
+          savePlaybackPosition();
         }
         if (event.data === YT.PlayerState.ENDED) {
+          // Clear saved position when video ends
+          if (data.playbackPositions && currentPlayingVideoId) {
+            delete data.playbackPositions[currentPlayingVideoId];
+            saveData();
+          }
           onVideoEnded();
         }
       }
@@ -1925,25 +1953,36 @@ async function openTranscript(videoId, title) {
 
   try {
     const pageUrl = 'https://www.youtube.com/watch?v=' + videoId;
-    const html = await corsGet(pageUrl);
+    let html = await corsGet(pageUrl);
     if (!html) { body.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><div class="title">' + escHtml(t('transcript.error')) + '</div></div>'; return; }
 
+    // Decode \x escape sequences if present (mobile YouTube pages)
+    if (html.match(/\\x[0-9a-fA-F]{2}/)) {
+      html = decodeJsEscapes(html);
+    }
+
     // Extract captions from ytInitialPlayerResponse
-    const m = html.match(/"captions"\s*:\s*(\{"captionTracks".+?\])\s*,\s*"/s) ||
-              html.match(/"captionTracks"\s*:\s*(\[.+?\])/s);
     let tracks = [];
-    if (m) {
-      try {
-        let jsonStr = m[0].includes('"captions"') ? m[1] + '}' : m[1];
-        // Try parsing the captionTracks array
-        const parsed = JSON.parse(jsonStr.startsWith('[') ? jsonStr : '{"captionTracks":' + jsonStr);
-        tracks = parsed.captionTracks || parsed || [];
-      } catch(e) {
-        // Try a different extraction
-        const trackMatch = html.match(/"captionTracks"\s*:\s*(\[[\s\S]*?\])\s*[,}]/);
-        if (trackMatch) {
-          try { tracks = JSON.parse(trackMatch[1]); } catch(e2) {}
-        }
+    // Method 1: Find captionTracks in the player response
+    const m1 = html.match(/"captionTracks"\s*:\s*(\[[\s\S]*?\])\s*[,}]/);
+    if (m1) {
+      try { tracks = JSON.parse(m1[1]); } catch(e) {}
+    }
+    // Method 2: Find captions object with captionTracks
+    if (tracks.length === 0) {
+      const m2 = html.match(/"captions"\s*:\s*\{[^}]*"captionTracks"\s*:\s*(\[[\s\S]*?\])/);
+      if (m2) {
+        try { tracks = JSON.parse(m2[1]); } catch(e) {}
+      }
+    }
+    // Method 3: Try ytInitialPlayerResponse as a whole
+    if (tracks.length === 0) {
+      const m3 = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});\s*(?:var|<\/script>)/s);
+      if (m3) {
+        try {
+          const pr = JSON.parse(m3[1]);
+          tracks = pr?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+        } catch(e) {}
       }
     }
 
@@ -2059,10 +2098,6 @@ function showAddChannelModal() {
     '<input type="text" id="ch-search-input" placeholder="' + escAttr(t('channels.searchPlaceholder')) + '" autofocus>' +
     '<button onclick="doChannelSearch()">' + escHtml(t('channels.searchBtn')) + '</button>' +
     '</div>' +
-    '<div class="form-group">' +
-    '<label>' + escHtml(t('categories.title')) + '</label>' +
-    '<select id="add-channel-category-search">' + getCategoryOptions() + '</select>' +
-    '</div>' +
     '<div id="ch-search-results" class="ch-search-results"></div>' +
     '</div>' +
     // URL tab
@@ -2072,10 +2107,6 @@ function showAddChannelModal() {
     '<input type="text" id="add-channel-url" placeholder="' + escAttr(t('channels.urlPlaceholder')) + '">' +
     '<div id="add-channel-error" style="color:var(--danger);font-size:12px;margin-top:4px;display:none;"></div>' +
     '<div id="add-channel-loading" style="color:var(--text-sub);font-size:12px;margin-top:4px;display:none;">' + escHtml(t('channels.loading')) + '</div>' +
-    '</div>' +
-    '<div class="form-group">' +
-    '<label>' + escHtml(t('categories.title')) + '</label>' +
-    '<select id="add-channel-category">' + getCategoryOptions() + '</select>' +
     '</div>' +
     '<div class="modal-actions">' +
     '<button class="btn btn-secondary" onclick="closeModal()">' + escHtml(t('videos.cancel')) + '</button>' +
@@ -2091,8 +2122,7 @@ function showAddChannelModal() {
 
   document.getElementById('add-channel-btn').onclick = function() {
     const url = document.getElementById('add-channel-url').value;
-    const cat = document.getElementById('add-channel-category').value;
-    addChannelFromUrl(url, cat);
+    addChannelFromUrl(url, null);
   };
 }
 
@@ -2232,7 +2262,7 @@ async function addChannelFromSearch(channelId, title, thumbnail, btnEl) {
     return;
   }
 
-  const categoryId = document.getElementById('add-channel-category-search')?.value || null;
+  const categoryId = null;
 
   const id = generateId();
   data.channels[id] = {
@@ -3011,6 +3041,7 @@ async function syncToCloud() {
       settings: data.settings || {},
       watchLog: data.watchLog || { totalSeconds: 0, channels: {}, videos: {} },
       playHistory: data.playHistory || [],
+      playbackPositions: data.playbackPositions || {},
       lastSync: now
     }, { merge: true });
 
@@ -3039,6 +3070,7 @@ async function syncFromCloud() {
       if (d.settings) data.settings = { ...data.settings, ...d.settings };
       if (d.watchLog) data.watchLog = d.watchLog;
       if (d.playHistory) data.playHistory = d.playHistory;
+      if (d.playbackPositions) data.playbackPositions = d.playbackPositions;
     }
     localStorage.setItem('myTube', JSON.stringify(data));
     lastSyncTime = Date.now();
